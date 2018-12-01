@@ -2,7 +2,7 @@
 
 ''' TensorFlowのハードウェア関係などの動作を設定するモジュール '''
 
-class TFConfig
+class TFConfig:
     ''' Tensorflowの動作設定を保存するクラス '''
 
     # class constant
