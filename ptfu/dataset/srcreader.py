@@ -328,6 +328,14 @@ class TarReader(ArchiveReader):
             self.tfp.close()
             self.tfp = None
 
+    def read2bytesio(self, name):
+        ''' nameで指定されるアーカイブメンバをBytesIOに読み込み、返す '''
+        self.open_src()
+        from io import BytesIO
+        stream = self.tfp.extractfile(tarname) # stereamはBufferedReader
+        stream.seek(0)
+        return BytesIO(stream.read())
+
     def storetype(self):
         ''' このArchiveReaderに対応するStoreTypeを返す '''
         from .datatype import StoreType
@@ -338,3 +346,85 @@ class TarReader(ArchiveReader):
         if self.tfp is None:
             self.open_src()
         return self.tfp.getnames()
+
+
+class Cifar10Reader(SrcReader):
+    ''' CIFAR-10 データソースからの読み出しを担当するクラス '''
+
+    def __init__(self, srcpath):
+        ''' Cifar10Readerのイニシャライザ。
+        srcpath: データセット元データの場所。strで指定する。 '''
+        self.srcpath = os.path.expanduser(srcpath)
+        self.tarreader = TarReader(datatype, self.srcpath)
+        self._redefine_tarreader()
+
+        self.actual_read = False
+        self.datadicts = None
+        return
+
+    def _redefine_tarreader():
+        ''' self.tarreaderを改変する '''
+        self.tarreader.arclist = self._newarclist
+
+    @staticmethod
+    def _newarclist(tarreader):
+        ''' tarreader用の新しいarclist関数 '''
+        alllist = tarreader.alllist()
+        return [x for x in alllist if '_batch' in x]
+
+#    def arclist(self):
+#        ''' 格納されているアーカイブメンバのうち、datatypeにマッチするもののイテレータを返す '''
+
+    def iterator(self):
+        ''' 個々のデータを読んでゆくイテレータを返すメンバ関数。
+        返すデータの型は(データの名前, npy ndarrayで表現された画像データ)のタプル '''
+        if not self.actual_read:
+            self._load_data()
+
+        iterators = []
+        for datadict in self.datadicts:
+            itarators.append(self._data_generator(datadict))
+        import itertools
+        return itertools.chain(iterators)
+
+    @staticmethod
+    def _data_generator(datadict):
+        ''' 1つのdatadictから順にデータを読み出す内部用ジェネレータ関数 '''
+        batchdata = datadict[b'data']
+        for i in range(10000):
+            npy = batchdata[i]
+            yield np.reshape(npy, (3, 32, 32)).transpose(1, 2, 0)
+
+    def datanumber(self):
+        ''' 元データのデータ件数を返す。 '''
+        if not self.actual_read:
+            self._load_data()
+        datasum = 0
+        for batch in self.datadicts:
+            datasum += len(batch['labels'])
+        return datasum
+
+    def namelist(self):
+        ''' 元データの名前リストを返す CIFAR-10では名前はないため、通し番号を返す'''
+        if self.actual_read:
+            self._load_data()
+        batchlist = self.tarreader.arclist()
+        namelist = []
+        for batch in batchlist:
+            for i in range(10000):
+                namelist.append(batch + '-' + str(i+1))
+        return namelist
+
+    def _load_data(self):
+        if self.actual_read:
+            return
+        import _pickle as cPickle
+        self.datadicts = []
+        batchlist = self.tarreader.arclist()
+        for batch in batchlist:
+            bytesio = self.tarreader.read2bytesio(batch)
+            self.datadicts.append(cPickle.load(bytesio, encoding='bytes'))
+        self.actual_read = True
+        return
+                                  
+        
