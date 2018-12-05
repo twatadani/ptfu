@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 ''' TensorFlowのSessionを多機能化するモジュール '''
 
 import tensorflow as tf
@@ -27,11 +25,17 @@ class SmartSession:
             self.fetches_extended.append(self.merged)
             self.last_summary = None
             initial_hooks.append(
-                [self.tfconfig.summary_save_interval, 1, False, self._write_summary])
+                SmartSessionHook(hook_func = self._write_summary,
+                                 hook_step = self.tfconfig.summary_save_interval,
+                                 hook_mod = 1,
+                                 synchronous = False))
 
         if self.tfconfig.use_checkpoint:
             initial_hooks.append(
-                [self.tfconfig.checkpoint_save_interval, 0, True, self._save_checkpoint])
+                SmartSessionHook(hook_func = self._save_checkpoint,
+                                 hook_step = self.tfconfig.checkpoint_save_interval,
+                                 hook_mod = 0,
+                                 synchronous = True))
 
         if len(initial_hooks) > 0:
             self.registerHooks(initial_hooks)
@@ -123,13 +127,7 @@ class SmartSession:
     def registerHooks(self, hook_list):
         '''step counter毎のhookを登録する
         hook_listはhookのリストまたはタプル形式でなくてはならない。
-        個々のhookは
-        (何ステップ数ごとに呼び出されるか,
-        ステップ数のmodulo, 
-        SynchronousかAsynchronousか(Sync: True, Async: False),
-        呼び出される関数、その引数リスト)の形式
-        Synchronousなものは同一スレッド内で、Asynchronousなものは
-        新しいスレッドで実行される'''
+        個々のhookはSmartSessionHookのインスタンス '''
 
         if self.hooks is None:
             self.hooks = hook_list
@@ -143,6 +141,14 @@ class SmartSession:
         return self.last_global_step
 
 
+    def run_hooks(self, global_step):
+        for hook in self.hooks:
+            if hook.mod == global_step % hook.step:
+                if hook.synchronous:
+                    hook()
+                else:
+                    future = self.executor.submit(hook)
+
     def _write_summary(self):
         ''' summary書き出し用のhook関数 '''
         self.summarywriter.add_summary(self.last_summary, self.last_global_step)
@@ -155,5 +161,31 @@ class SmartSession:
         prefix = os.path.join(savedir, 'model.ckpt')
         result = self.saver.save(self.session, prefix, self.last_global_step)
         return result
+
+
+    class SmartSessionHook:
+        ''' SmartSessionの学習ループ中に実行されるhook関数を表すクラス
+        hook関数には引数は原則与えられない '''
+
+        def __init__(self, hook_func=None, hook_step=1, hook_mod=0, synchronous=True)
+        ''' hook_func: 呼び出される関数
+        hook_step: 何ステップ毎にhook_funcが呼び出されるか
+        hook_mod: step % hook_step = hook_modの時に呼び出される
+        synchronous: Trueの場合同一スレッドで実行される。Falseの場合新しいスレッドで実行される。 '''
+        self.func = hook_func if hook_func is not None else self.dummy
+        self.step = hook_step
+        self.mod = hook_mod
+        self.sync = synchronous
+        return
+
+        def __call__(self):
+            ''' hook_funcを呼び出す '''
+            return self.func()
+
+
+        def dummy(self):
+            ''' 何もしないダミー関数 '''
+            return
+            
         
         
