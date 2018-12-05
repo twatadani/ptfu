@@ -116,7 +116,8 @@ class SmartSession:
             self.last_summary = result[sum_idx]
 
         # stepに応じて登録されたhookを実行
-        self.run_hooks(self.last_global_step)
+        self.run_hooks(self.last_global_step, feed_dict=feed_dict,
+                       options=options, run_metadata=run_metadata)
 
         # 自動で追加した対象を削除して呼び出し側に結果を返す
         if is_fetches_iterable:
@@ -141,13 +142,31 @@ class SmartSession:
         return self.last_global_step
 
 
-    def run_hooks(self, global_step):
+    def run_hooks(self, global_step, feed_dict=None, options=None, run_metadata=None):
+        if hook.tensorlist is None or len(hook.tensorlist) == 0:
+            noarg = True
+        else:
+            noarg = False
+
+        if not norarg:
+            tensorvaluedic = {}
+            values = self.session.run(hook.tensorlist, feed_dict, options, run_metadata)
+            for i, tensor in enumerate(hook.tensorlist):
+                tensorvaluedic[tensor] = values[i]
+
         for hook in self.hooks:
             if hook.mod == global_step % hook.step:
                 if hook.synchronous:
-                    hook()
+                    if noarg:
+                        hook()
+                    else:
+                        hook(tensorvaluedic)
                 else:
-                    future = self.executor.submit(hook)
+                    if noarg:
+                        future = self.executor.submit(hook)
+                    else:
+                        future = self.executor.submit(hook, tensorvaluedic)
+        return
 
     def _write_summary(self):
         ''' summary書き出し用のhook関数 '''
@@ -164,23 +183,32 @@ class SmartSession:
 
 
     class SmartSessionHook:
-        ''' SmartSessionの学習ループ中に実行されるhook関数を表すクラス
-        hook関数には引数は原則与えられない '''
+        ''' SmartSessionの学習ループ中に実行されるhook関数を表すクラス '''
 
-        def __init__(self, hook_func=None, hook_step=1, hook_mod=0, synchronous=True)
-        ''' hook_func: 呼び出される関数
+        def __init__(self, hook_func=None, hook_step=1, hook_mod=0, synchronous=True,
+                     required_tensor_list=None)
+        ''' 
+        hook_func: 呼び出される関数。hook_funcはhook_func(tensorvaluedict)の形式で呼び出される。
         hook_step: 何ステップ毎にhook_funcが呼び出されるか
         hook_mod: step % hook_step = hook_modの時に呼び出される
-        synchronous: Trueの場合同一スレッドで実行される。Falseの場合新しいスレッドで実行される。 '''
+        synchronous: Trueの場合同一スレッドで実行される。Falseの場合新しいスレッドで実行される。
+        required_tensor_list: このhook実行に必要なtensorのリスト '''
         self.func = hook_func if hook_func is not None else self.dummy
         self.step = hook_step
         self.mod = hook_mod
         self.sync = synchronous
+        if required_tensor_list is None:
+            self.tensorlist = []
+        else:
+            self.tensorlist = required_tensor_list
         return
 
-        def __call__(self):
+        def __call__(self, tensorvaluedict):
             ''' hook_funcを呼び出す '''
-            return self.func()
+            if self.tensorlist is None or len(self.tensorlist) == 0:
+                return self.func()
+            else:
+                return self.func(tensorvaluedict)
 
 
         def dummy(self):
