@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 ''' SrcReaderモジュール: データセットの元データの読み込み処理を記述する '''
 
 import os
@@ -38,6 +36,10 @@ class SrcReader:
     def datanumber(self):
         ''' 元データのデータ件数を返す。 '''
         return self.areader.datanumber()
+
+    def namelist(self):
+        ''' 元データの名前リストを返す '''
+        return self.areader.namelist()
 
 class TypeReader:
     ''' 各データ形式に沿ったデータの読み出しを担当するインターフェースを規定する基底クラス '''
@@ -240,6 +242,10 @@ class ArchiveReader:
         largeiter = self._iterext(upperext, namelist)
         mergeiter = itertools.chain(smalliter, largeiter)
         return mergeiter
+
+    def namelist(self):
+        ''' 格納されているアーカイブメンバのうち、datatypeにマッチするものの名前のリストを返す '''
+        return list(self.arclist())
         
     @staticmethod
     def _iterext(ext, namelist):

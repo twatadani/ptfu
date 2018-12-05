@@ -1,8 +1,6 @@
-# -*- coding: utf-8 -*-
-
 ''' Personal TensorFlow Utility - TensorFlow開発のための個人的なユーティリティーパッケージ '''
 
-from . import TFConfig
-from . import SmartSession
+from . import tfconfig
+from . import smartsession
 
 name='ptfu'

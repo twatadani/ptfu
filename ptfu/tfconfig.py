@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 ''' TensorFlowのハードウェア関係などの動作を設定するモジュール '''
 
 class TFConfig:

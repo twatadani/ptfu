@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 ''' Functions.py DICOMユーティリティにおけるユーティリティー関数群 '''
 
 def arithmetic_rshift(x, shift_bits):

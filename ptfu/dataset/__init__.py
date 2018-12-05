@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 ''' Personal TensorFlow Utility dataset サブパッケージ: データセット作成用ユーティリティ '''
 
 from .datatype import DataType as DataType
