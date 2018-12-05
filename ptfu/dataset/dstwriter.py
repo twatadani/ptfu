@@ -33,11 +33,14 @@ class DstWriter:
         self.wcount = None # 書き込みを行った件数
         return
 
-    def setup(self, srcreader):
-        ''' 設定をfixして書き込み準備完了の状態にする '''
+    def setup(self, srcreader, filterfunc=None):
+        ''' 設定をfixして書き込み準備完了の状態にする
+        filterfunc: srcreaderから読み込んだndarrayを変換するフィルター関数。返り値もndarray '''
 
         self.fixed = True
         self.srcreader = srcreader
+        if filterfunc is not None:
+            self.filterfunc = filterfunc
         self.iterator = self.srcreader.iterator()
         ndata = srcreader.datanumber()
         self.wcount = 0
@@ -97,6 +100,8 @@ class DstWriter:
         if self.fixed == False:
             self.setup()
         name, ndarray = self.iterator.__next__()
+        if self.filterfunc is not None:
+            ndarray = self.filterfunc(ndarray)
         nextwriter = self._nextwriter()
         nextwriter.appendNext(name, ndarray)
         self._increment_nextwriter()
