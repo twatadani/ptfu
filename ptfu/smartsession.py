@@ -171,8 +171,6 @@ class SmartSession:
             #if not noarg:
             tensorvaluedic = {}
             if len(hook.tensorlist) > 0:
-                print(hook.hookname)
-                print(hook.tensorlist)
                 values = self.session.run(hook.tensorlist, feed_dict, options, run_metadata)
             else:
                 values = []

@@ -81,8 +81,6 @@ class LayerBasedNeuralNet(NeuralNet):
         ''' このNeuralNetにレイヤーを追加する。
         layer: Tensorflowのレイヤー 例えばtf.layers.conv2dやtf.layers.denseなど
         options: layerに与えるパラメータ '''
-        print(options)
-        #print(**options)
         self.layers.append(NNLayer(layer, inputs, **options))
         return
 
@@ -120,9 +118,6 @@ class NNLayer:
 
     def __init__(self, tflaYer, inputs, **options):
 
-        print('tflayer=', tflaYer)
-        print('inputs=', inputs)
-        print('**options=', options)
         self.tflayer = tflaYer(inputs, **options)
 
         if 'name' in options:

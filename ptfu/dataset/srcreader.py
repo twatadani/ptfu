@@ -6,6 +6,8 @@ import glob
 import itertools
 from zipfile import ZipFile
 from tarfile import TarFile
+from io import BytesIO
+from threading import Lock
 
 import pydicom
 from PIL import Image
@@ -26,6 +28,8 @@ class SrcReader:
 
         self.areader = self.storetype.reader()(self.datatype, self.srcpath) # archive reader
         self.treader = self.datatype.reader() # type reader
+
+        self.srclock = Lock()
         return
 
     def iterator(self):
@@ -44,8 +48,11 @@ class SrcReader:
     def getbyname(self, name):
         ''' 名前を指定してソースからの読み出しを行う 
         返り値はnumpy ndarray形式 '''
+        self.srclock.acquire()
         bytesio = self.areader.get_bytesio_byname(name)
-        return self.treader.read_from_bytes(bytesio)
+        np = self.treader.read_from_bytes(bytesio)
+        self.srclock.release()
+        return np
 
 class TypeReader:
     ''' 各データ形式に沿ったデータの読み出しを担当するインターフェースを規定する基底クラス '''
@@ -341,7 +348,6 @@ class TarReader(ArchiveReader):
     def get_bytesio_byname(self, name):
         ''' nameで指定されるアーカイブメンバをBytesIOに読み込み、返す '''
         self.open_src()
-        from io import BytesIO
         stream = self.tfp.extractfile(name) # stereamはBufferedReader
         stream.seek(0)
         return BytesIO(stream.read())

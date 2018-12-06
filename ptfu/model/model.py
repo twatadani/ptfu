@@ -26,15 +26,15 @@ class Model:
 
 class SingleNetworkModel(Model):
     ''' 単一のニューラルネットから構成される学習モデル '''
-
-
     
     def __init__(self, neural_network, lossfunc, optimizer):
         from ..nn.neuralnet import NeuralNet
+        import tensorflow.summary as summary
         super(SingleNetworkModel, self).__init__()
         assert isinstance(neural_network, NeuralNet) # 型チェック
         self.nn = neural_network
         self.loss = lossfunc
+        summary.scalar(name = 'Loss', tensor = self.loss)
         self.optimizer = optimizer
         self.training = False
         return
@@ -96,14 +96,16 @@ class SingleNetworkModel(Model):
         else:
             tfconfig = TFConfig
 
-        print('before sessioning')
         # Sessionを立ち上げて学習を行う
         with SmartSession(tfconfig) as session:
 
+            # ループ中のhookを設定
             if 'hooks' in options:
                 session.registerHooks(options['hooks'])
+
+            # ループ終了条件の設定
+            endflag.setSmartSession(session)
             
-            print('entering session')
             while not endflag.should_end():
                 minibatch = self._minibatch_fromq()
 
@@ -112,7 +114,6 @@ class SingleNetworkModel(Model):
                 else:
                     fd = self._create_fd(minibatch, fdmapper)
                     session.run(train_op, feed_dict=fd)
-                print('run!')
 
         self.training = False
         return

@@ -3,9 +3,17 @@
 class EndFlag:
     ''' 学習の終了条件を表す基底クラス '''
 
-    def should_end(self, **options):
+    def __init__(self):
+        self.smartsession = None
+        return
+
+    def should_end(self):
         ''' 学習を終了すべきかどうかを返す '''
         raise NotImplementedError
+
+    def setSmartSession(self, smartsession):
+        self.smartsession = smartsession
+        return
 
     def __and__(self, other):
         ''' &演算子のオーバーロード '''
@@ -26,15 +34,17 @@ class MaxGlobalStepFlag(EndFlag):
     ''' global step数が一定に達すると終了する条件 '''
 
     def __init__(self, max_global_step):
+        super(MaxGlobalStepFlag, self).__init__()
         assert max_global_step > 0
         self.maxstep = max_global_step
 
-    def should_end(self, **options):
+    def should_end(self):
         ''' 学習を終了すべきかを返す '''
-        if 'global_step' in options:
-            return options[global_step] >= self.maxstep
-        else:
+        if self.smartsession is None:
             return False
+        else:
+            gstep = self.smartsession.get_global_step()
+            return gstep >= self.maxstep
 
 class AndEndFlag(EndFlag):
     ''' 複数のEndFlagの&演算子による複合判定 '''
@@ -44,9 +54,9 @@ class AndEndFlag(EndFlag):
         self.flag2 = flag2
         return
 
-    def should_end(self, **options):
+    def should_end(self):
         ''' 学習を終了すべきか返す '''
-        return self.flag1.should_end(options) & self.flag2.should_end(options)
+        return self.flag1.should_end() & self.flag2.should_end()
 
 class OrEndFlag(EndFlag):
     ''' 複数のEndFlagの|演算子による複合判定 '''
@@ -56,6 +66,6 @@ class OrEndFlag(EndFlag):
         self.flag2 = flag2
         return
 
-    def should_end(self, **options):
+    def should_end(self):
         ''' 学習を終了すべきか返す '''
-        return self.flag1.should_end(options) | self.flag2.should_end(options)
+        return self.flag1.should_end() | self.flag2.should_end()
