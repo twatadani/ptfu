@@ -4,6 +4,14 @@
 
 class DatasetCreator:
 
+    @staticmethod
+    def datasetCreatorFromCustomRW(srcreader, dstwriter):
+        ''' srcreader, dstwriterを指定してDatasetCreatorのインスタンスを生成する '''
+        instance = DatasetCreator(None, None, None, None, None, None)
+        instance.srcreader = srcreader
+        instance.dstwriter = dstwriter
+        return instance
+
     def __init__(self,
                  srcdatatype,
                  srcstoretype,
@@ -20,8 +28,15 @@ class DatasetCreator:
         datasetname: 作成するデータセットの名前 '''
         from .srcreader import SrcReader
         from .dstwriter import DstWriter
-        self.srcreader = SrcReader(srcdatatype, srcstoretype, srcpath)
-        self.dstwriter = DstWriter(dststoretype, dstpath, datasetname)
+
+        self.srcreader = None
+        self.dstwriter = None
+
+        if srcdatatype is not None and srcstoretype is not None and srcpath is not None:
+            self.srcreader = SrcReader(srcdatatype, srcstoretype, srcpath)
+
+        if dststoretype is not None and dstpath is not None and datasetname is not None:
+            self.dstwriter = DstWriter(dststoretype, dstpath, datasetname)
 
         self.logfunc = None
         return
@@ -54,10 +69,10 @@ class DatasetCreator:
         logfunc(content)
         return
 
-    def create(self):
+    def create(self, filter_func=None):
         ''' 設定をfixしてデータセット作成を行う '''
         # writerの設定をfixする
-        self.dstwriter.setup(self.srcreader)
+        self.dstwriter.setup(self.srcreader, filter_func)
         
         # データセット件数を調査
         ndata = self.srcreader.datanumber()

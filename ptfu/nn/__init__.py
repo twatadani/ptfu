@@ -1,5 +1,5 @@
 ''' Personal TensorFlow Utility nn サブパッケージ: NeuralNet '''
 
-from . import neuralnet
+from .neuralnet import NeuralNet, LayerBasedNeuralNet
 
 name='ptfu.nn'

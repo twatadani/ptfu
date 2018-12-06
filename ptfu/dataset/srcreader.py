@@ -25,7 +25,7 @@ class SrcReader:
         self.srcpath = os.path.expanduser(srcpath)
 
         self.areader = self.storetype.reader()(self.datatype, self.srcpath) # archive reader
-        self.treader = self.datatype.reader # type reader
+        self.treader = self.datatype.reader() # type reader
         return
 
     def iterator(self):
@@ -40,6 +40,12 @@ class SrcReader:
     def namelist(self):
         ''' 元データの名前リストを返す '''
         return self.areader.namelist()
+
+    def getbyname(self, name):
+        ''' 名前を指定してソースからの読み出しを行う 
+        返り値はnumpy ndarray形式 '''
+        bytesio = self.areader.get_bytesio_byname(name)
+        return self.treader.read_from_bytes(bytesio)
 
 class TypeReader:
     ''' 各データ形式に沿ったデータの読み出しを担当するインターフェースを規定する基底クラス '''
@@ -260,6 +266,10 @@ class ArchiveReader:
         arclistがオーバーライドされていればalllistは定義しなくともよい '''
         raise NotImplementedError
 
+    def get_bytesio_byname(self, name):
+        ''' 名前を指定してアーカイブメンバを読み出す '''
+        raise NotImplementedError
+
 class DirReader(ArchiveReader):
     ''' ディレクトリ内に生ファイルが格納されている形式のデータを読み出すArchiveReader '''
 
@@ -328,11 +338,11 @@ class TarReader(ArchiveReader):
             self.tfp.close()
             self.tfp = None
 
-    def read2bytesio(self, name):
+    def get_bytesio_byname(self, name):
         ''' nameで指定されるアーカイブメンバをBytesIOに読み込み、返す '''
         self.open_src()
         from io import BytesIO
-        stream = self.tfp.extractfile(tarname) # stereamはBufferedReader
+        stream = self.tfp.extractfile(name) # stereamはBufferedReader
         stream.seek(0)
         return BytesIO(stream.read())
 
@@ -354,26 +364,25 @@ class Cifar10Reader(SrcReader):
     def __init__(self, srcpath):
         ''' Cifar10Readerのイニシャライザ。
         srcpath: データセット元データの場所。strで指定する。 '''
+        from . import DataType, StoreType
         self.srcpath = os.path.expanduser(srcpath)
-        self.tarreader = TarReader(datatype, self.srcpath)
+        self.storetype = StoreType.TAR
+        self.datatype = DataType.OTHER
+        self.tarreader = TarReader(DataType.NPY, self.srcpath) # NPYはダミー
         self._redefine_tarreader()
 
         self.actual_read = False
         self.datadicts = None
         return
 
-    def _redefine_tarreader():
+    def _redefine_tarreader(self):
         ''' self.tarreaderを改変する '''
         self.tarreader.arclist = self._newarclist
 
-    @staticmethod
-    def _newarclist(tarreader):
+    def _newarclist(self):
         ''' tarreader用の新しいarclist関数 '''
-        alllist = tarreader.alllist()
+        alllist = self.tarreader.alllist()
         return [x for x in alllist if '_batch' in x]
-
-#    def arclist(self):
-#        ''' 格納されているアーカイブメンバのうち、datatypeにマッチするもののイテレータを返す '''
 
     def iterator(self):
         ''' 個々のデータを読んでゆくイテレータを返すメンバ関数。
@@ -381,19 +390,21 @@ class Cifar10Reader(SrcReader):
         if not self.actual_read:
             self._load_data()
 
-        iterators = []
+        batchdata = []
+        batchname = []
         for datadict in self.datadicts:
-            itarators.append(self._data_generator(datadict))
-        import itertools
-        return itertools.chain(iterators)
+            batchdata.extend(datadict[b'data'])
+            batchname.extend(datadict[b'filenames'])
+        return self._data_generator(batchname, batchdata)
 
     @staticmethod
-    def _data_generator(datadict):
+    def _data_generator(batchname, batchdata):
         ''' 1つのdatadictから順にデータを読み出す内部用ジェネレータ関数 '''
-        batchdata = datadict[b'data']
-        for i in range(10000):
-            npy = batchdata[i]
-            yield np.reshape(npy, (3, 32, 32)).transpose(1, 2, 0)
+        import os.path
+        for i in range(len(batchname)):
+            name = batchname[i].decode()
+            name = os.path.splitext(name)[0]
+            yield (name, np.reshape(batchdata[i], (3, 32, 32)).transpose(1, 2, 0))
 
     def datanumber(self):
         ''' 元データのデータ件数を返す。 '''
@@ -401,18 +412,25 @@ class Cifar10Reader(SrcReader):
             self._load_data()
         datasum = 0
         for batch in self.datadicts:
-            datasum += len(batch['labels'])
+            #print(batch.keys())
+            datasum += len(batch[b'labels'])
         return datasum
 
     def namelist(self):
-        ''' 元データの名前リストを返す CIFAR-10では名前はないため、通し番号を返す'''
+        ''' 元データの名前リストを返す '''
         if self.actual_read:
             self._load_data()
-        batchlist = self.tarreader.arclist()
+
         namelist = []
-        for batch in batchlist:
+        for datadict in self.datadicts:
             for i in range(10000):
-                namelist.append(batch + '-' + str(i+1))
+                nalemlist.append(datadict[b'filenames'][i])
+
+        #batchlist = self.tarreader.arclist()
+        #namelist = []
+        #for batch in batchlist:
+        #    for i in range(10000):
+        #        namelist.append(batch + '-' + str(i+1))
         return namelist
 
     def _load_data(self):
@@ -422,7 +440,7 @@ class Cifar10Reader(SrcReader):
         self.datadicts = []
         batchlist = self.tarreader.arclist()
         for batch in batchlist:
-            bytesio = self.tarreader.read2bytesio(batch)
+            bytesio = self.tarreader.get_bytesio_byname(batch)
             self.datadicts.append(cPickle.load(bytesio, encoding='bytes'))
         self.actual_read = True
         return

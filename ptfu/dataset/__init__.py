@@ -1,10 +1,10 @@
 ''' Personal TensorFlow Utility dataset サブパッケージ: データセット作成用ユーティリティ '''
 
-from .datatype import DataType as DataType
-from .datatype import StoreType as StoreType
-from .srcreader import SrcReader as SrcReader
-from .dstwriter import DstWriter as DstWriter
-from .datasetcreator import DatasetCreator as DatasetCreator
+from .datatype import DataType, StoreType
+from .srcreader import SrcReader, Cifar10Reader
+from .dstwriter import DstWriter
+from .datasetcreator import DatasetCreator
+from .dataset import TFRecordDataSet, NPYDataSet, LabelStyle
 
 # DICOMは例外なのでgetextを定義しなおす
 DataType.DICOM.getext = (lambda self: 'dcm')

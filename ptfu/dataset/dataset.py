@@ -22,16 +22,16 @@ class DataSet:
 
     def __init__(self, srclist, labellist, labelstyle, **options):
         ''' DataSetのイニシャライザ
-        通常、ライブラリユーザはこのイニシャライザを直接呼び出すのではなく、load関数を使う。
         srclist: データセット格納ファイルのリスト
         labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
         labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
         options: labelstyleに依存するオプション '''
 
-        if hasattr(srclist, __getitem__):
+        if isinstance(srclist, list) or isinstance(srclist, tuple):
+        #if hasattr(srclist, '__getitem__'):
             self.srclist = srclist
         elif srclist is not None:
-            self.srclist = [self.srclist]
+            self.srclist = [srclist]
         else:
             self.srclist = []
 
@@ -50,72 +50,92 @@ class DataSet:
 class NPYDataSet(DataSet):
     ''' NPYファイルで格納されているデータセット '''
 
-    import random
-    import numpy as np
-
     def __init__(self, srclist, labellist, labelstyle, **options):
         ''' NPUYDataSetのイニシャライザ 
         options内に
         storetype: StoreTypeメンバ
         labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)
         となるようなstoretype, labelfuncが必須 '''
-        super(NPYDataSet, self).__init__(srclist, labellist, labelstyle, options)
+        from . import SrcReader, DataType
+        super(NPYDataSet, self).__init__(srclist, labellist, labelstyle, **options)
 
         self.readers = []
         self.namelist = [] # データネームのリスト 実際はreaderごとにリストにするので二重リスト
-        self.list_for_minibatch = [] # ミニバッチ取得用のリスト
-        assert labelfunc is not None
-        self.labelfunc = options[labelfunc]
-        for srcfile in srclist:
-            reader = SrcReader(DataType.NPY, options[storetype], srcfile)
+
+        #self.list_for_minibatch = [] # ミニバッチ取得用のリスト
+        assert 'labelfunc' in options
+        self.labelfunc = options['labelfunc']
+        for srcfile in self.srclist:
+            reader = SrcReader(DataType.NPY, options['storetype'], srcfile)
             self.readers.append(reader)
-            namelist.append(reader.namelist())
+            self.namelist.append(reader.namelist())
+
+        self.namelist_flat = []
+        for sublist in self.namelist:
+            self.namelist_flat.extend(sublist)
+            print('len(sublist)=', len(sublist), ', len(self.namelist_flat)=', len(self.namelist_flat))
         return
 
     def obtain_minibatch(self, minibatchsize):
         ''' minibatchsizeで指定されたサイズのミニバッチを取得する '''
-        
-        if len(self.list_for_minibatch) < minibatchsize:
-            self._extend_list
-
+        import random
+        #if len(self.list_for_minibatch) < minibatchsize:
+        #    self._extend_list()
         # 返り値となるdictを準備
         minibatch_dict = None
-
+        #print(1, 'minibatchsize=', minibatchsize)
         # ミニバッチ対象となる名前リストをスライスする
-        minibatch_namelist = self.list_for_minibatch[0:minibatchsize]
+        #minibatch_namelist = self.list_for_minibatch[0:minibatchsize]
+        minibatch_namelist = random.sample(self.namelist_flat, minibatchsize)
+        #print(2)
         # データを取得する
         for name in minibatch_namelist:
-            for i in range(len(readers)):
-                if name in namelist[i]:
-                    data = readers[i].getbyname(name)
+           # print(3)
+            for i in range(len(self.readers)):
+                #print(4)
+                if name in self.namelist[i]:
+                    #print(5)
+                    obtained = False
+                    trycount = 0
+                    while (not obtained) and (trycount < 5):
+                        try:
+                            trycount += 1
+                            data = self.readers[i].getbyname(name)
+                            obtained = True
+                            if trycount >= 2:
+                                print(trycount, '回で読み込み成功しました')
+                        except:
+                            print('データ読み込みに失敗したため、リトライします trycount=', trycount)
                     datadict = self.labelfunc(name, data)
                     minibatch_dict = self._mergedict(minibatch_dict, datadict)
-        
+        #print(6)
         # 取得したミニバッチ分のデータを削除する
-        self.list_for_minibatch = self.list_for_minibatch[minibatchsize:
-                                                          len(self.list_for_minibatch)]
+        #self.list_for_minibatch = self.list_for_minibatch[minibatchsize:
+        #                                                  len(self.list_for_minibatch)]
         return minibatch_dict
 
 
     @staticmethod
     def _mergedict(minibatch_dict, datadict):
         ''' ミニバッチデータの辞書に1件のデータ辞書をmergeし、新しいminibatch dictを返す内部用関数 '''
+        import numpy as np
         if minibatch_dict is None:
             return datadict
         else:
             for key in datadict.keys():
-                value = np.concatenate(minibatch_dict[key], datadict[key], axis=0)
+                value = np.concatenate([minibatch_dict[key], datadict[key]], axis=0)
                 minibatch_dict[key] = value
             return minibatch_dict
 
-    def _extend_list(self):
-        ''' minibatchリストが短くなったときに延長する内部用関数 '''
-        newnamelist = []
-        for sublist in self.namelist:
-            newnamelist.extend(sublist)
-        random.shuffle(newnamelist)
-        self.list_for_minibatch.extend(newnamelist)
-        return
+    #def _extend_list(self):
+    #    ''' minibatchリストが短くなったときに延長する内部用関数 '''
+    #    import random
+    #    newnamelist = []
+    #    for sublist in self.namelist:
+    #        newnamelist.extend(sublist)
+    #    random.shuffle(newnamelist)
+    #    self.list_for_minibatch.extend(newnamelist)
+    #    return
 
 class TFRecordDataSet(DataSet):
     ''' TFRecord形式のデータセット '''

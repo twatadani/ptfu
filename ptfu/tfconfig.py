@@ -23,55 +23,56 @@ class TFConfig:
         # GPU関係の設定
         ## GPUを使用するかどうか
         self.use_gpu = True # デフォルト
-        if use_gpu in kwargs:
-            self.use_gpu = kwargs[use_gpu]
+        if 'use_gpu' in kwargs:
+            self.use_gpu = kwargs['use_gpu']
 
         ## 使用するGPUのリスト
         self.gpu_list = None # デフォルトはNone
-        if gpu_list in kwargs:
-            self.gpu_list = kwargs[gpu_list]
+        if 'gpu_list' in kwargs:
+            self.gpu_list = kwargs['gpu_list']
 
         ## GPU並列動作数
         self.gpu_parallelism = 1 # デフォルト
-        if gpu_parallelism in kwargs:
-            self.gpu_parallelism = kwargs[gpu_parallelism]
+        if 'gpu_parallelism' in kwargs:
+            self.gpu_parallelism = kwargs['gpu_parallelism']
 
 
         # Summary, Checkpoint保存関係の設定
         ## Summaryを使用するかどうか
         self.use_summary = False # デフォルト
-        if use_summary in kwargs:
-            self.use_summary = kwargs[use_summary]
+        if 'use_summary' in kwargs:
+            self.use_summary = kwargs['use_summary']
 
         ## Summaryを保存する間隔
         self.summary_save_interval = 100 # デフォルト
-        if summary_save_interval in kwargs:
-            self.summary_save_interval = kwargs[summary_save_interval]
+        if 'summary_save_interval' in kwargs:
+            self.summary_save_interval = kwargs['summary_save_interval']
 
         ## Checkpointを使用するかどうか
         self.use_checkpoint = False # デフォルト
-        if use_checkpoint in kwargs:
-            self.use_checkpoint = kwargs[use_checkpoint]
+        if 'use_checkpoint' in kwargs:
+            self.use_checkpoint = kwargs['use_checkpoint']
 
         ## Checkpointを保存する間隔
         self.checkpoint_save_interval = 1000 # デフォルト
-        if checkpoint_save_interval in kwargs:
-            self.checkpoint_save_interval = kwargs[checkpoint_save_interval]
+        if 'checkpoint_save_interval' in kwargs:
+            self.checkpoint_save_interval = kwargs['checkpoint_save_interval']
 
         ## summary, checkpointを保存するディレクトリの設定
         self.summarydir = '.' # デフォルトはカレントディレクトリ
-        if summarydir in kwargs:
-            self.summarydir = kwargs[summarydir]
+        if 'summarydir' in kwargs:
+            self.summarydir = kwargs['summarydir']
 
         ## 前回の学習を再開するかどうか
         self.use_autoreload = True # デフォルト
-        if use_autoreload in kwargs:
-            self.use_autoreload = kwargs[use_autoreload]
+        if 'use_autoreload' in kwargs:
+            self.use_autoreload = kwargs['use_autoreload']
 
         return
 
     def create_configproto(self):
         ''' 設定情報からTensorFlowのConfigProtoを作成する '''
+        import tensorflow as tf
         if self.use_gpu:
             gpu_options = tf.GPUOptions(
                 visible_device_list = self._list2strlist(self.gpu_list),

@@ -72,7 +72,7 @@ class DstWriter:
         ''' 内部用の関数 i番目のdstpathの文字列を作成する '''
         lastname = self.basename
         if self.ngroups == 1:
-            lastname += ''
+            lastname += '' + '.' + self.storetype.getext()
         else:
             lastname += '-' + str(i) + '.' + self.storetype.getext()
         return os.path.join(self.dstpath, lastname)
@@ -98,8 +98,9 @@ class DstWriter:
     def appendNext(self):
         ''' iteratorから得た1件のデータを書き込む '''
         if self.fixed == False:
-            self.setup()
-        name, ndarray = self.iterator.__next__()
+            raise ValueError('Dstwriter is not fixes when appendNext called.')
+
+        name, ndarray = next(self.iterator)
         if self.filterfunc is not None:
             ndarray = self.filterfunc(ndarray)
         nextwriter = self._nextwriter()

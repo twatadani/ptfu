@@ -12,6 +12,7 @@ class DataType(Enum):
     JPG = auto()
     DICOM = auto()
     NPY = auto() # .npy形式のndarray
+    OTHER = auto() # その他
 
     def getext(self):
         ''' 拡張子の文字列を返す '''

@@ -7,16 +7,17 @@ class NeuralNet:
     def __init__(self, input_tensors, network_name=None):
         ''' コンストラクタ
         input_tensors: このNeuralNetの入力に使われるtensor, placeholder等のTensorFlowパラメータ
+        辞書形式で、'name': tensorの組み合わせとなる
         network_name: このNeuralNetインスタンスの名前となる文字列
         '''
 
         self.inputs = None
         if input_tensors is None: # Noneの場合
-            self.inputs = [] # 空リストにする
-        elif hasattr(input_tensors, __getitem__): # リスト、タプル等の場合
+            self.inputs = {} # 空辞書にする
+        elif isinstance(input_tensors, dict): #辞書型の場合
             self.inputs = input_tensors # そのまま使う
         else: # リストでない場合は
-            self.inputs = [ input_tensors ]
+            self.inputs = { input: input_tensors }
 
         self.name = None
         if network_name is None:
@@ -24,8 +25,12 @@ class NeuralNet:
         else:
             self.name = network_name
 
-        self.outputs = []
+        self.outputs = {}
         return
+
+    def define_network(self):
+        ''' ネットワークを定義する。実際には具象クラスで行う。 '''
+        raise NotImplementedError
 
     def get_input_tensors(self):
         ''' このNeuralNetの入力tensorのリストを得る '''
@@ -35,12 +40,9 @@ class NeuralNet:
         ''' このNeuralNetの出力tensorのリストを得る '''
         return self.outputs
 
-    def add_output_tensor(self, tensor):
+    def add_output_tensor(self, tensor, name):
         ''' NeuralNetの出力tensorのリストにtensorを加える '''
-        if hasattr(tensor, __getitem__):
-            self.outputs.extend(tensor)
-        else:
-            self.outputs.append(tensor)
+        self.outputs[name] = tensor
         return
 
 class LayerBasedNeuralNet(NeuralNet):
@@ -71,12 +73,17 @@ class LayerBasedNeuralNet(NeuralNet):
         ''' このNeuralNetのlayerのリストを取得する '''
         return self.layers
 
-    def add_layer(self, layer, **options):
+    def last_layer(self):
+        ''' このNeuralNetの最後のlayerを取得する '''
+        return self.layers[-1]
+
+    def add_layer(self, layer, inputs, **options):
         ''' このNeuralNetにレイヤーを追加する。
         layer: Tensorflowのレイヤー 例えばtf.layers.conv2dやtf.layers.denseなど
         options: layerに与えるパラメータ '''
-
-        self.layers.append(Layer(layer, **options))
+        print(options)
+        #print(**options)
+        self.layers.append(NNLayer(layer, inputs, **options))
         return
 
     def print_network(self):
@@ -104,19 +111,22 @@ class LayerBasedNeuralNet(NeuralNet):
 
         return s
 
-class Layer:
+class NNLayer:
     ''' Layerを表現するクラス。TensorFlowの関数あるいはクラスに対するラッパー
     ライブラリユーザはこのクラスを直接コードする必要はない '''
 
     # クラス変数
     sep = '|'
 
-    def __init__(self, tflayer, **options):
+    def __init__(self, tflaYer, inputs, **options):
 
-        self.tflayer = tflayer(**options)
+        print('tflayer=', tflaYer)
+        print('inputs=', inputs)
+        print('**options=', options)
+        self.tflayer = tflaYer(inputs, **options)
 
         if 'name' in options:
-            self.name = options[name]
+            self.name = options['name']
         else:
             self.name = self.tflayer.name
             assert self.name is not None
