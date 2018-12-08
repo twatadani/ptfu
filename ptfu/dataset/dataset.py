@@ -1,6 +1,9 @@
 ''' dataset.py - datasetモジュール: DataSetを定義する '''
 
 from enum import Enum, auto
+import os
+import os.path
+import pickle
 
 class LabelStyle(Enum):
     ''' データセット内のラベル付けの方式を表現するenum '''
@@ -55,16 +58,20 @@ class NPYDataSet(DataSet):
         options内に
         storetype: StoreTypeメンバ
         labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)
-        となるようなstoretype, labelfuncが必須 '''
+        となるようなstoretype, labelfuncが必須 
+        必須ではないオプション:
+        use_diskcache: TrueまたはFalseで指定。デフォルトはFalse
+        temporary directoryに一度読み込んだデータについてはlabelfuncを適用した辞書の状態でキャッシュを作成する。二度目以降の読み込みはdisk cacheを優先する '''
         from . import SrcReader, DataType
+        from concurrent.futures import ThreadPoolExecutor
         super(NPYDataSet, self).__init__(srclist, labellist, labelstyle, **options)
 
         self.readers = []
         self.namelist = [] # データネームのリスト 実際はreaderごとにリストにするので二重リスト
 
-        #self.list_for_minibatch = [] # ミニバッチ取得用のリスト
         assert 'labelfunc' in options
         self.labelfunc = options['labelfunc']
+        assert 'storetype' in options
         for srcfile in self.srclist:
             reader = SrcReader(DataType.NPY, options['storetype'], srcfile)
             self.readers.append(reader)
@@ -73,28 +80,115 @@ class NPYDataSet(DataSet):
         self.namelist_flat = []
         for sublist in self.namelist:
             self.namelist_flat.extend(sublist)
-            print('len(sublist)=', len(sublist), ', len(self.namelist_flat)=', len(self.namelist_flat))
+
+        # disk cacheの設定
+        self.use_diskcache = False
+        self.tempdir = None
+        if 'use_diskcache' in options:
+            self.use_diskcache = True
+            self._create_tempdir()
+
+        self.executor = ThreadPoolExecutor(max_workers=8)
         return
+
+    def __del__(self):
+        ''' デストラクタ '''
+        self._cleanup_tempdir()
+        return
+
+    def _cleanup_tempdir(self):
+        ''' テンポラリディレクトリをクリーンアップする '''
+        if self.tempdir is not None:
+            self.tempdir.cleanup()
+            self.tempdir = None
+        return
+
+    def _create_tempdir(self):
+        ''' テンポラリディレクトリを作成する '''
+        from tempfile import TemporaryDirectory
+        if self.tempdir is None:
+            self.tempdir = TemporaryDirectory()
 
     def obtain_minibatch(self, minibatchsize):
         ''' minibatchsizeで指定されたサイズのミニバッチを取得する '''
         import random
-        #if len(self.list_for_minibatch) < minibatchsize:
-        #    self._extend_list()
+        from concurrent.futures import wait
+
         # 返り値となるdictを準備
         minibatch_dict = None
-        #print(1, 'minibatchsize=', minibatchsize)
-        # ミニバッチ対象となる名前リストをスライスする
-        #minibatch_namelist = self.list_for_minibatch[0:minibatchsize]
+
+        # ミニバッチ対象となる名前リストを選択する
         minibatch_namelist = random.sample(self.namelist_flat, minibatchsize)
-        #print(2)
+
+        # futures
+        namefutures = []
+
         # データを取得する
         for name in minibatch_namelist:
-           # print(3)
+            namefutures.append(
+                self.executor.submit(self._obtain_name, name))
+
+            # datadict = None
+            # # まず、ディスクキャッシュを探す
+            # if self.use_diskcache:
+            #     path = os.path.join(self.tempdir.name, name + '.pkl')
+            #     try:
+            #         if os.path.exists(path): # ディスクキャッシュにヒット
+            #             datadict = pickle.load(path)
+            #             print('disk cache hit!')
+            #     except:
+            #         datadict = None
+                
+            # if datadict is None: # キャッシュにヒットしなかった場合
+            #     for i in range(len(self.readers)):
+            #         if name in self.namelist[i]:
+            #             obtained = False
+            #             trycount = 0
+            #             while (not obtained) and (trycount < 5):
+            #                 try:
+            #                     trycount += 1
+            #                     data = self.readers[i].getbyname(name)
+            #                     obtained = True
+            #                     if trycount >= 2:
+            #                         print(trycount, '回で読み込み成功しました')
+            #                 except:
+            #                     print('データ読み込みに失敗したため、リトライします trycount=', trycount)
+            #                 datadict = self.labelfunc(name, data)
+            #                 if self.use_diskcache: # ディスクキャッシュに保存する
+            #                     future = self.executor.submit(self._save_pickle, datadict, path)
+            # minibatch_dict = self._mergedict(minibatch_dict, datadict)
+
+        wait(namefutures)
+        datadicts = map(lambda x: x.result(), namefutures)
+        keys = namefutures[0].result().keys()
+        # print('5 shape:', list(datadicts)[5]['fourier'].shape) # OK
+        return self._mergedict(datadicts, keys)
+
+    def _obtain_name(self, name):
+        ''' obtain_minibatch の個々のデータを取得する '''
+        datadict = None
+        # まず、ディスクキャッシュを探す
+        if self.use_diskcache:
+            path = os.path.join(self.tempdir.name, name + '.pkl')
+            try:
+                #print('search disk cache')
+                if os.path.exists(path): # ディスクキャッシュにヒット
+                    #print('found disk cache')
+                    with open(path, mode='rb') as fp:
+                        datadict = pickle.load(fp)
+                        #print('disk cache hit!')
+                #else:
+                    #print('not found')
+                    
+            except:
+                #print('exception while loading disk cache')
+                #import traceback
+                #traceback.print_exc()
+                datadict = None
+                
+        if datadict is None: # キャッシュにヒットしなかった場合
             for i in range(len(self.readers)):
-                #print(4)
                 if name in self.namelist[i]:
-                    #print(5)
                     obtained = False
                     trycount = 0
                     while (not obtained) and (trycount < 5):
@@ -106,26 +200,45 @@ class NPYDataSet(DataSet):
                                 print(trycount, '回で読み込み成功しました')
                         except:
                             print('データ読み込みに失敗したため、リトライします trycount=', trycount)
-                    datadict = self.labelfunc(name, data)
-                    minibatch_dict = self._mergedict(minibatch_dict, datadict)
-        #print(6)
-        # 取得したミニバッチ分のデータを削除する
-        #self.list_for_minibatch = self.list_for_minibatch[minibatchsize:
-        #                                                  len(self.list_for_minibatch)]
-        return minibatch_dict
+                        datadict = self.labelfunc(name, data)
+                        if self.use_diskcache: # ディスクキャッシュに保存する
+                            future = self.executor.submit(self._save_pickle, datadict, path)
+        #print('datadict[fourier].shape:', datadict['fourier'].shape) # OK
+        return datadict
 
+    def _save_pickle(self, datadict, path):
+        try:
+            with open(path, mode='wb') as fp:
+                pickle.dump(datadict, fp, protocol=pickle.HIGHEST_PROTOCOL)
+                #print('pickle save success!', path)
+        except: # 失敗したら消す 所詮キャッシュなので消しても大丈夫
+            os.remove(path)
+        return
 
     @staticmethod
-    def _mergedict(minibatch_dict, datadict):
+    def _mergedict(datadicts, keys):
         ''' ミニバッチデータの辞書に1件のデータ辞書をmergeし、新しいminibatch dictを返す内部用関数 '''
         import numpy as np
-        if minibatch_dict is None:
-            return datadict
-        else:
-            for key in datadict.keys():
-                value = np.concatenate([minibatch_dict[key], datadict[key]], axis=0)
-                minibatch_dict[key] = value
-            return minibatch_dict
+
+        datadictlist = tuple(datadicts)
+
+        minibatchdict = {}
+        for key in keys:
+            #print('key = ', key)
+            mapped = map(lambda x: x[key], datadictlist)
+            listed = tuple(mapped)
+            #print(listed)
+            #print('len(listed)=', len(listed))
+            minibatchdict[key] = np.concatenate(listed, axis=0)
+        return minibatchdict
+
+        # if minibatch_dict is None:
+        #     return datadict
+        # else:
+        #     for key in datadict.keys():
+        #         value = np.concatenate([minibatch_dict[key], datadict[key]], axis=0)
+        #         minibatch_dict[key] = value
+        #     return minibatch_dict
 
     #def _extend_list(self):
     #    ''' minibatchリストが短くなったときに延長する内部用関数 '''

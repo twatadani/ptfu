@@ -144,9 +144,7 @@ class SingleNetworkModel(Model):
                 print('_qloop loop: qsize=', self.trainq.qsize())
                 if self.trainq.qsize() < self.qthreashold:
                     for _ in range(self.qbatchsize):
-                        print('minibatch obtaining...')
                         minibatch = dataset.obtain_minibatch(minibatchsize)
-                        print('minibatch obtained')
                         if minibatch is not None:
                             self.trainq.put(minibatch)
                 else:

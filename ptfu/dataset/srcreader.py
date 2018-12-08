@@ -9,7 +9,6 @@ from tarfile import TarFile
 from io import BytesIO
 from threading import Lock
 
-import pydicom
 from PIL import Image
 import numpy as np
 
@@ -149,11 +148,13 @@ class DICOMReader(TypeReader):
         filename: ファイル名
         srcpath, filenameはos.path.joinで結合するので、srcpathにファイル名まで記述して、filenameが空でも
         よい。zip, tarとの引数の数をそろえるため2引数関数としている。 '''
+        import pydicom
         fullpath = os.path.join(srcpath, filename)
         return dcm2npy(pydicom.dcmread(fullpath))
 
     def read_from_bytes(self, bytesio):
         ''' インメモリに読み込まれたBytesIOオブジェクトからデータを読み出し、ndarray形式で返す。 '''
+        import pydicom
         return dcm2npy(pydicom.dcmread(bytesio))
 
     def dcm2npy(self, dcmdataset, dtype=np.float32):

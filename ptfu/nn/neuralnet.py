@@ -77,11 +77,11 @@ class LayerBasedNeuralNet(NeuralNet):
         ''' このNeuralNetの最後のlayerを取得する '''
         return self.layers[-1]
 
-    def add_layer(self, layer, inputs, **options):
+    def add_layer(self, layer, **options):
         ''' このNeuralNetにレイヤーを追加する。
         layer: Tensorflowのレイヤー 例えばtf.layers.conv2dやtf.layers.denseなど
         options: layerに与えるパラメータ '''
-        self.layers.append(NNLayer(layer, inputs, **options))
+        self.layers.append(NNLayer(layer, **options))
         return
 
     def print_network(self):
@@ -116,9 +116,9 @@ class NNLayer:
     # クラス変数
     sep = '|'
 
-    def __init__(self, tflaYer, inputs, **options):
+    def __init__(self, tflayer, **options):
 
-        self.tflayer = tflaYer(inputs, **options)
+        self.tflayer = tflayer(**options)
 
         if 'name' in options:
             self.name = options['name']
