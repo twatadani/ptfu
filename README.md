@@ -1,4 +1,4 @@
-# Personal TensorFlow Utility (ptfu) ver 0.2
+# Personal TensorFlow Utility (ptfu) ver 0.3.1
 
 Python / Tensorflowで開発を行うための個人的なユーティリティー群
 
@@ -6,6 +6,8 @@ Python / Tensorflowで開発を行うための個人的なユーティリティ�
 
 * version 0.1 - プロジェクトを作成。__init__.pyを作成しパッケージとしてデザイン。SmartSessionおよびTFConfigを実装。
 * version 0.2 - datasetサブパッケージを作成
+* version 0.3 - nn, modelサブパッケージを作成
+* version 0.3.1 - 並列実行、キャッシュによる高速化を実装
 
 ## ptfuの全体構成
 
