@@ -30,13 +30,14 @@ class SingleNetworkModel(Model):
     def __init__(self, neural_network, lossfunc, optimizer):
         from ..nn.neuralnet import NeuralNet
         import tensorflow.summary as summary
+
         super(SingleNetworkModel, self).__init__()
         assert isinstance(neural_network, NeuralNet) # 型チェック
         self.nn = neural_network
         self.loss = lossfunc
         summary.scalar(name = 'Loss', tensor = self.loss)
         self.optimizer = optimizer
-        self.training = False
+        self.training = None # マルチプロセスモデルに従い、trainingはmultiprocessing.Queueに変更。
         return
 
     def train(self, **options):
@@ -54,8 +55,11 @@ class SingleNetworkModel(Model):
         '''
         #import tensorflow as tf
         from .. import SmartSession
+        from multiprocessing import Manager
 
-        self.training = True
+        manager = Manager()
+
+        self.training = manager.Queue(2)
 
         # データセットの設定
         from ..dataset import TFRecordDataSet
@@ -74,17 +78,20 @@ class SingleNetworkModel(Model):
         assert 'minibatchsize' in options
         minibatchsize = options['minibatchsize']
         if not is_tfrecord: # TFRecordではキューイングは行わない
-            from concurrent.futures import ThreadPoolExecutor
-            from queue import Queue
+            from concurrent.futures import ProcessPoolExecutor
+            from .. import functions as f
             qparallel = options['qparallel'] if 'qparallel' in options else 3
+
             qmax = 200
-            self.trainq = Queue(qmax)
+            self.trainq = manager.Queue(qmax)
             self.qthreashold = 100
             self.qbatchsize = (qmax - self.qthreashold) // qparallel
-            executor = ThreadPoolExecutor()
+            ncpu = f.cpu_count()
+            executor = ProcessPoolExecutor(ncpu)
+            datasetinfo = dataset.toDataSetInfo()
             for i in range(qparallel):
-                executor.submit(self._qloop, dataset, minibatchsize)
-                #self._qloop(dataset, minibatchsize)
+                executor.submit(self._qloop, datasetinfo, self.trainq, self.qthreashold,
+                                self.qbatchsize, minibatchsize, self.training)
         
         # 計算グラフを定義する
         #self.nn.define_network()
@@ -95,6 +102,9 @@ class SingleNetworkModel(Model):
             tfconfig = options['tfconfig']
         else:
             tfconfig = TFConfig
+
+        # ネットワーク構造をプリントする
+        print(self.nn.print_network())
 
         # Sessionを立ち上げて学習を行う
         with SmartSession(tfconfig) as session:
@@ -115,7 +125,7 @@ class SingleNetworkModel(Model):
                     fd = self._create_fd(minibatch, fdmapper)
                     session.run(train_op, feed_dict=fd)
 
-        self.training = False
+        self.training.put(True)
         return
 
     def _minibatch_fromq(self):
@@ -135,18 +145,21 @@ class SingleNetworkModel(Model):
             fd[key] = minibatch[fdmapper[key]]
         return fd
 
-    def _qloop(self, dataset, minibatchsize):
-        ''' ミニバッチキューをバックグラウンドで作成するスレッドワーカー関数 '''
+    @staticmethod
+    def _qloop(datasetinfo, queue, qthreashold, qbatchsize, minibatchsize, signalqueue):
+        ''' ミニバッチキューをバックグラウンドで作成するワーカー関数
+        processベースの並列処理のため、static methodで実装する '''
         from time import sleep
         import random
+
         try:
-            while self.training:
-                print('_qloop loop: qsize=', self.trainq.qsize())
-                if self.trainq.qsize() < self.qthreashold:
-                    for _ in range(self.qbatchsize):
+            dataset = datasetinfo.constructDataSet()
+            while signalqueue.empty():
+                if queue.qsize() < qthreashold:
+                    for _ in range(qbatchsize):
                         minibatch = dataset.obtain_minibatch(minibatchsize)
                         if minibatch is not None:
-                            self.trainq.put(minibatch)
+                            queue.put(minibatch)
                 else:
                     sleep(random.random())
         except:

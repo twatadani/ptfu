@@ -7,7 +7,7 @@ import itertools
 from zipfile import ZipFile
 from tarfile import TarFile
 from io import BytesIO
-from threading import Lock
+
 
 from PIL import Image
 import numpy as np
@@ -15,7 +15,7 @@ import numpy as np
 class SrcReader:
     ''' データソースからの読み出しを担当するクラス '''
 
-    def __init__(self, srcdatatype, srcstoretype, srcpath):
+    def __init__(self, srcdatatype, srcstoretype, srcpath, use_diskcache=True):
         ''' SrcReaderのイニシャライザ。
         srcdatatype: データセット元データの形式。DataType enumのいずれかを指定する。
         srcstoretype: データセット元データの格納形式。StoreType enumのいずれかを指定する。
@@ -25,10 +25,9 @@ class SrcReader:
         self.storetype = srcstoretype
         self.srcpath = os.path.expanduser(srcpath)
 
-        self.areader = self.storetype.reader()(self.datatype, self.srcpath) # archive reader
+        self.areader = self.storetype.reader()(self.datatype, self.srcpath, use_diskcache) # archive reader
         self.treader = self.datatype.reader() # type reader
 
-        self.srclock = Lock()
         return
 
     def iterator(self):
@@ -47,11 +46,7 @@ class SrcReader:
     def getbyname(self, name):
         ''' 名前を指定してソースからの読み出しを行う 
         返り値はnumpy ndarray形式 '''
-        self.srclock.acquire()
-        bytesio = self.areader.get_bytesio_byname(name)
-        np = self.treader.read_from_bytes(bytesio)
-        self.srclock.release()
-        return np
+        return self.areader.getbyname(name, self.treader)
 
 class TypeReader:
     ''' 各データ形式に沿ったデータの読み出しを担当するインターフェースを規定する基底クラス '''
@@ -199,14 +194,18 @@ class NPYReader(TypeReader):
 class ArchiveReader:
     ''' 格納形式それぞれからデータを読み出すインターフェースを規定する基底クラス '''
 
-    def __init__(self, srcdatatype, srcpath):
+    def __init__(self, srcdatatype, srcpath, use_diskcache=True):
         ''' イニシャライザ
         srcdatatype: データのフォーマット
         srcpath: データ格納元のパス
         '''
+        from threading import Lock
+        
         self.datatype = srcdatatype
         self.srcpath = srcpath
         self.typereader = self.datatype.reader()
+        self.use_diskcache = use_diskcache
+        self.readlock = Lock()
         return
 
     def __del__(self):
@@ -278,11 +277,22 @@ class ArchiveReader:
         ''' 名前を指定してアーカイブメンバを読み出す '''
         raise NotImplementedError
 
+    def getbyname(self, name, treader):
+        ''' 名前とTypeReaderを指定してアーカイブメンバを読み出す
+        デフォルトの動作は一旦BytesIOを介する '''
+        print('ArchiveReader getbyname called name=', name)
+        self.readlock.acquire()
+        bytesio = self.get_bytesio_byname(name)
+        data = treader.read_from_bytes(bytesio)
+        self.readlock.release()
+        return data
+        
+
 class DirReader(ArchiveReader):
     ''' ディレクトリ内に生ファイルが格納されている形式のデータを読み出すArchiveReader '''
 
-    def __init__(self, srcdatatype, srcpath):
-        super(DirReader, self).__init__(srcdatatype, srcpath)
+    def __init__(self, srcdatatype, srcpath, use_diskcache=True):
+        super(DirReader, self).__init__(srcdatatype, srcpath, use_diskcache)
 
     def storetype(self):
         ''' このArchiveReaderに対応するStoreTypeを返す '''
@@ -299,8 +309,8 @@ class DirReader(ArchiveReader):
 class ZipReader(ArchiveReader):
     ''' zipアーカイブされたデータを読み込むリーダー '''
 
-    def __init__(self, srcdatatype, srcpath):
-        super(ZipReader, self).__init__(srcdatatype, srcpath)
+    def __init__(self, srcdatatype, srcpath, use_diskcache=True):
+        super(ZipReader, self).__init__(srcdatatype, srcpath, use_diskcache)
         self.zfp = None
 
     def open_src(self):
@@ -330,9 +340,33 @@ class ZipReader(ArchiveReader):
 class TarReader(ArchiveReader):
     ''' tarアーカイブされたデータを読み込むリーダー '''
 
-    def __init__(self, srcdatatype, srcpath):
-        super(TarReader, self).__init__(srcdatatype, srcpath)
+    # class variable
+    diskcachedict = {}
+    
+    def __init__(self, srcdatatype, srcpath, use_diskcache=True):
+        super(TarReader, self).__init__(srcdatatype, srcpath, use_diskcache)
         self.tfp = None
+
+        if self.use_diskcache is True:
+            from concurrent.futures import ProcessPoolExecutor
+            from tempfile import TemporaryDirectory
+
+            if not srcpath in TarReader.diskcachedict: # 同じファイルに対するディスクキャッシュは1つのみ
+                self.tmpdir = TemporaryDirectory()
+                TarReader.diskcachedict[srcpath] = self.tmpdir
+                self.pexecutor = ProcessPoolExecutor(1)
+                future = self.pexecutor.submit(self._prepare_diskcache, srcpath, self.tmpdir)
+            else: # すでにディスクキャッシュがある場合
+                print('TarReaderのディスクキャッシュを流用します')
+                self.tmpdir = TarReader.diskcachedict[srcpath]
+                
+        return
+
+    def __del__(self):
+        if hasattr(self, 'tmpdir') and self.tmpdir is not None:
+            print('TarReaderの一時ディレクトリをクリーンアップします')
+            self.tmpdir.cleanup()
+        super(TarReader, self).__del__()
         return
 
     def open_src(self):
@@ -353,6 +387,20 @@ class TarReader(ArchiveReader):
         stream.seek(0)
         return BytesIO(stream.read())
 
+    def getbyname(self, name, treader):
+        ''' nameとTypeReaderを指定してアーカイブメンバを読み出す '''
+        try:
+            if self.use_diskcache: # まずディスクキャッシュを探す
+                fullname = os.path.join(self.tmpdir.name, name)
+                if os.path.exists(fullname):
+                    return treader.read_from_rawfile(self.tmpdir.name, name)
+
+            # キャッシュヒットしなかった場合 親クラスの実装を使う
+            return super(TarReader, self).getbyname(name, treader)
+        except:
+            import traceback
+            traceback.print_exc()
+
     def storetype(self):
         ''' このArchiveReaderに対応するStoreTypeを返す '''
         from .datatype import StoreType
@@ -363,6 +411,21 @@ class TarReader(ArchiveReader):
         if self.tfp is None:
             self.open_src()
         return self.tfp.getnames()
+
+    @staticmethod
+    def _prepare_diskcache(srcpath, tmpdir):
+        ''' 読み込み用のディスクキャッシュを準備する '''
+        import tarfile
+        try:
+            with tarfile.open(name=srcpath, mode='r') as tfp:
+                print('TarReaderのディスクキャッシュを作成します:', tmpdir.name)
+                tfp.extractall(path=tmpdir.name)
+        except:
+            import traceback
+            traceback.print_exc()
+        return
+        
+        
 
 
 class Cifar10Reader(SrcReader):
@@ -419,7 +482,6 @@ class Cifar10Reader(SrcReader):
             self._load_data()
         datasum = 0
         for batch in self.datadicts:
-            #print(batch.keys())
             datasum += len(batch[b'labels'])
         return datasum
 

@@ -26,8 +26,11 @@ class DatasetCreator:
         dststoretype: 作成するデータセットのアーカイブ形式。StoreType enumから選択する
         dstpath: 作成するデータセットの置き場所。ディレクトリで指定する。
         datasetname: 作成するデータセットの名前 '''
+
         from .srcreader import SrcReader
         from .dstwriter import DstWriter
+
+        from concurrent.futures import ThreadPoolExecutor
 
         self.srcreader = None
         self.dstwriter = None
@@ -39,6 +42,8 @@ class DatasetCreator:
             self.dstwriter = DstWriter(dststoretype, dstpath, datasetname)
 
         self.logfunc = None
+
+        self.executor = ThreadPoolExecutor()
         return
 
     def setSplitByGroups(self, n):
@@ -71,6 +76,8 @@ class DatasetCreator:
 
     def create(self, filter_func=None):
         ''' 設定をfixしてデータセット作成を行う '''
+        from concurrent.futures import wait
+
         # writerの設定をfixする
         self.dstwriter.setup(self.srcreader, filter_func)
         
@@ -91,16 +98,27 @@ class DatasetCreator:
         self.log('##############################')
         
         # データセット作成開始
-        for counter in range(ndata):
-            self.dstwriter.appendNext()
-            if counter % 100 == 0 and counter > 0:
-                self.log(counter, '件まで作成しました。')
+        #writefunc = lambda x: x.appendNext()
+
+        nwritten = 0
+        writebatch = 100
+        while nwritten < ndata:
+            nextnwrite = min(ndata-nwritten, writebatch)
+            futures = []
+            for _ in range(nextnwrite):
+                futures.append(self.executor.submit(self.dstwriter.appendNext))
+
+            wait(futures)
+            for future in futures:
+                future.result(1) # 例外が発生していればここで送出される
+            nwritten += nextnwrite
+            self.log(nwritten, '件まで作成しました。')
+
+        #for counter in range(ndata):
+        #    
+        #    self.dstwriter.appendNext()
+        #    if counter % 100 == 0 and counter > 0:
+        #        self.log(counter, '件まで作成しました。')
 
         self.log('データセット作成が終了しました。')
         return
-        
-        
-
-        
-        
-

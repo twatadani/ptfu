@@ -6,6 +6,7 @@ import os.path
 from io import BytesIO
 from zipfile import ZipFile
 from tarfile import TarFile, TarInfo
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, wait
 
 import numpy as np
 
@@ -31,16 +32,32 @@ class DstWriter:
         self.iterator = None
         self.fixed = False # 設定を固定するロック
         self.wcount = None # 書き込みを行った件数
+
+        from threading import Lock
+        self.writelock = Lock() # マルチスレッド処理のロック
+        self.executor = None
         return
 
     def setup(self, srcreader, filterfunc=None):
         ''' 設定をfixして書き込み準備完了の状態にする
         filterfunc: srcreaderから読み込んだndarrayを変換するフィルター関数。返り値もndarray '''
+        from .. import functions as f
 
         self.fixed = True
         self.srcreader = srcreader
         if filterfunc is not None:
             self.filterfunc = filterfunc
+
+        # filter funcがpicklableかを調べる
+        if self.filterfunc is not None:
+            if f.picklable(self.filterfunc):
+                ncpu = f.cpu_count()
+                maxprocess = max(1, ncpu-1)
+                self.executor = ProcessPoolExecutor(maxprocess)
+                print('DstWriterのexecutorをProcessPoolExecutorに設定しました。maxprocess=', maxprocess)
+            else:
+                self.executor = ThreadPoolExecutor(1)
+
         self.iterator = self.srcreader.iterator()
         ndata = srcreader.datanumber()
         self.wcount = 0
@@ -98,14 +115,29 @@ class DstWriter:
     def appendNext(self):
         ''' iteratorから得た1件のデータを書き込む '''
         if self.fixed == False:
-            raise ValueError('Dstwriter is not fixes when appendNext called.')
+            raise ValueError('Dstwriter is not fixed when appendNext called.')
 
         name, ndarray = next(self.iterator)
         if self.filterfunc is not None:
-            ndarray = self.filterfunc(ndarray)
+            if self.executor is not None:
+                future = self.executor.submit(self.filterfunc, ndarray)
+                wait([future])
+                try:
+                    ndarray = future.result()
+                except:
+                    import traceback
+                    print('警告: DstWriter.appendNextで例外発生: ただしexecutorを使わない方法でリカバーを試みます。')
+                    traceback.print_exc()
+                    ndarray = self.filterfunc(ndarray)
+            else:
+                ndarray = self.filterfunc(ndarray)
+
+        self.writelock.acquire()
         nextwriter = self._nextwriter()
         nextwriter.appendNext(name, ndarray)
         self._increment_nextwriter()
+        self.writelock.release()
+
         return
 
     def _nextwriter(self):

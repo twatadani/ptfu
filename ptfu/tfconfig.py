@@ -81,6 +81,9 @@ class TFConfig:
                 gpu_options = gpu_options,
                 allow_soft_placement = True)
         else:
+            # 環境変数でGPUを制限する
+            import os
+            os.environ['CUDA_VISIBLE_DEVICES'] = ''
             cp = tf.ConfigProto(
                 allow_soft_placement = True)
         

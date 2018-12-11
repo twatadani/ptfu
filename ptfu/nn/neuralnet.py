@@ -87,6 +87,9 @@ class LayerBasedNeuralNet(NeuralNet):
     def print_network(self):
         ''' ネットワーク構造を文字列として表現する。strを返す '''
 
+        br = LayerBasedNeuralNet.br
+        seprow = LayerBasedNeuralNet.seprow
+        
         # ヘッダ
         s = '##### Network Structure of '
         s += self.name + ' #####' + br
@@ -95,7 +98,7 @@ class LayerBasedNeuralNet(NeuralNet):
         # ネットワーク構造
         # name, type, output shape, trainable parameters
         s += seprow
-        s += Layer.shapeline(['layer name', 'layer type', 'output shape', 'train params'])
+        s += NNLayer.shapeline(['layer name', 'layer type', 'output shape', 'train params'])
         s += seprow
 
         for layer in self.layers:
@@ -104,7 +107,7 @@ class LayerBasedNeuralNet(NeuralNet):
 
         s += seprow
 
-        s += Layer.shapeline(['', '', 'total', nparam])
+        s += NNLayer.shapeline(['', '', 'total', nparam])
         s += seprow
 
         return s
@@ -133,7 +136,7 @@ class NNLayer:
         if content is None:
             content = ''
 
-        collen = LayerBasedNetwork.col_width # カラムの文字数
+        collen = LayerBasedNeuralNet.col_width # カラムの文字数
         orig = str(content)
         olen = len(orig)
         prelen = (collen - olen) // 2
@@ -160,13 +163,14 @@ class NNLayer:
     @staticmethod
     def shapeline(content):
         ''' contentの内容から出力用の1行文字列を作成する '''
-
+        sep = NNLayer.sep
+        
         s = sep
         for i in range(LayerBasedNeuralNet.ncols):
             if len(content) >= i+1:
-                s += self.shapecol(content[i])
+                s += NNLayer.shapecol(content[i])
             else:
-                s += sel.shapecol(None)
+                s += NNLayer.shapecol(None)
             s += sep
         return s
 
@@ -186,6 +190,7 @@ class NNLayer:
 
     def trainable_parameters(self):
         ''' このlayerに含まれるtrainable parametersのリストを返す '''
+        import tensorflow as tf
         params = [x for x in tf.trainable_variables() if self.tflayer.name in x.name]
         return params
 
