@@ -135,7 +135,12 @@ class NPYDataSet(DataSet):
 
     def __del__(self):
         ''' デストラクタ '''
-        self._cleanup_tempdir()
+        if hasattr(self, 'tempdir_owner') and self.tempdir_owner is True:
+            self._cleanup_tempdir()
+        if self.texecutor is not None:
+            self.texecutor.shutdown()
+        if self.pexecutor is not None:
+            self.pexecutor.shutdown()
         return
 
     @staticmethod
@@ -163,9 +168,11 @@ class NPYDataSet(DataSet):
                 print('NPYDataSetのディスクキャッシュを作成します')
                 self.tempdir = TemporaryDirectory()
                 NPYDataSet.diskcachedict[self.srclist[0]] = self.tempdir
+                self.tempdir_owner = True
         else:
             print('NPYDataSetのディスクキャッシュを流用します')
             self.tempdir = NPYDataSet.diskcachedict[self.srclist[0]]
+            self.tempdir_owner = False
 
     def obtain_minibatch(self, minibatchsize):
         ''' minibatchsizeで指定されたサイズのミニバッチを取得する '''

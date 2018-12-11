@@ -356,16 +356,21 @@ class TarReader(ArchiveReader):
                 TarReader.diskcachedict[srcpath] = self.tmpdir
                 self.pexecutor = ProcessPoolExecutor(1)
                 future = self.pexecutor.submit(self._prepare_diskcache, srcpath, self.tmpdir)
+                self.diskcache_owner = True
             else: # すでにディスクキャッシュがある場合
                 print('TarReaderのディスクキャッシュを流用します')
                 self.tmpdir = TarReader.diskcachedict[srcpath]
+                self.diskcache_owner = False
                 
         return
 
     def __del__(self):
         if hasattr(self, 'tmpdir') and self.tmpdir is not None:
-            print('TarReaderの一時ディレクトリをクリーンアップします')
-            self.tmpdir.cleanup()
+            if hasattr(self, 'diskcache_owner') and self.diskcache_owner == True:
+                print('TarReaderの一時ディレクトリをクリーンアップします')
+                self.tmpdir.cleanup()
+        if hasattr(self, 'pexecutor') and self.pexecutor is not None:
+            self.pexecutor.shutdown()
         super(TarReader, self).__del__()
         return
 

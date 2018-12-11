@@ -38,6 +38,10 @@ class DstWriter:
         self.executor = None
         return
 
+    def __del__(self):
+        if hasattr(self, executor) and self.executor is not None:
+            self.executor.shutdown()
+
     def setup(self, srcreader, filterfunc=None):
         ''' 設定をfixして書き込み準備完了の状態にする
         filterfunc: srcreaderから読み込んだndarrayを変換するフィルター関数。返り値もndarray '''
