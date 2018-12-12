@@ -99,15 +99,18 @@ class LayerBasedNeuralNet(NeuralNet):
         # name, type, output shape, trainable parameters
         s += seprow
         s += NNLayer.shapeline(['layer name', 'layer type', 'output shape', 'train params'])
+        s += br
         s += seprow
 
         for layer in self.layers:
             s += layer.oneline_string()
-            nparam += len(layer.trainable_parameters())
+            nparam += layer.count_params(layer.trainable_parameters())
+            s += br
 
         s += seprow
 
         s += NNLayer.shapeline(['', '', 'total', nparam])
+        s += br
         s += seprow
 
         return s
@@ -121,12 +124,13 @@ class NNLayer:
 
     def __init__(self, tflayer, **options):
 
-        self.tflayer = tflayer(**options)
+        self.tflayer = tflayer
+        self.outtensor = tflayer(**options)
 
         if 'name' in options:
             self.name = options['name']
         else:
-            self.name = self.tflayer.name
+            self.name = self.outtensor.name
             assert self.name is not None
         return
 
@@ -178,20 +182,41 @@ class NNLayer:
     def oneline_string(self):
         ''' 出力用の1行文字列を返す '''
         return self.shapeline([self.name, self.gettype(), self.output_shape(),
-                               self.trainable_parameters()])
+                               self.count_params(self.trainable_parameters())])
 
     def gettype(self):
         ''' このlayerのタイプ (conv2d, denseなど)を返す '''
-        return type(self.tflayer)
+        #from ..logger import get_default_logger
+        #logger = get_default_logger()
+        #logger.debug(str(type(self.tflayer)))
+        #logger.debug(self.tflayer.__name__)
+        return self.tflayer.__name__
+        #return type(self.tflayer)
+
+    def output_tensor(self):
+        ''' このlayerの出力tensorを返す '''
+        return self.outtensor
 
     def output_shape(self):
         ''' このlayerの出力tensorのshapeを返す '''
-        return self.tflayer.shape
+        return self.outtensor.shape
 
     def trainable_parameters(self):
         ''' このlayerに含まれるtrainable parametersのリストを返す '''
         import tensorflow as tf
-        params = [x for x in tf.trainable_variables() if self.tflayer.name in x.name]
+        params = [x for x in tf.trainable_variables() if self.name in x.name]
         return params
+
+    @staticmethod
+    def count_params(trainable_parameters):
+        ''' trainable_parametersの出力から訓練可能パラメータの数を計算する '''
+        sum = 0
+        for variable in trainable_parameters:
+            shape = variable.shape
+            params = 1
+            for dim in shape:
+                params *= dim
+            sum += params
+        return sum
 
         

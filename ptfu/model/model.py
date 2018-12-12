@@ -53,12 +53,12 @@ class SingleNetworkModel(Model):
         qparallel: ミニバッチ取得キューイングの並列スレッド数
         hooks: 一定回数毎に呼び出されるhookのリスト hookはSmartSessionHookオブジェクト
         '''
-        #import tensorflow as tf
         from .. import SmartSession
+        from ..logger import get_default_logger
         from multiprocessing import Manager
 
+        logger = get_default_logger()
         manager = Manager()
-
         self.training = manager.Queue(2)
 
         # データセットの設定
@@ -104,7 +104,7 @@ class SingleNetworkModel(Model):
             tfconfig = TFConfig
 
         # ネットワーク構造をプリントする
-        print(self.nn.print_network())
+        logger.log(self.nn.print_network())
 
         # Sessionを立ち上げて学習を行う
         with SmartSession(tfconfig) as session:
@@ -160,11 +160,15 @@ class SingleNetworkModel(Model):
                         minibatch = dataset.obtain_minibatch(minibatchsize)
                         if minibatch is not None:
                             queue.put(minibatch)
+                        if not signalqueue.empty():
+                            continue
                 else:
                     sleep(random.random())
         except:
             import traceback
-            traceback.print_exc()
+            from ..logger import get_default_logger
+            logger = get_default_logger()
+            logger.error(traceback.format_exc())
         return
 
 

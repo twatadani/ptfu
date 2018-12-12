@@ -280,7 +280,6 @@ class ArchiveReader:
     def getbyname(self, name, treader):
         ''' 名前とTypeReaderを指定してアーカイブメンバを読み出す
         デフォルトの動作は一旦BytesIOを介する '''
-        print('ArchiveReader getbyname called name=', name)
         self.readlock.acquire()
         bytesio = self.get_bytesio_byname(name)
         data = treader.read_from_bytes(bytesio)
@@ -344,7 +343,9 @@ class TarReader(ArchiveReader):
     diskcachedict = {}
     
     def __init__(self, srcdatatype, srcpath, use_diskcache=True):
+        from ..logger import get_default_logger
         super(TarReader, self).__init__(srcdatatype, srcpath, use_diskcache)
+        logger = get_default_logger()
         self.tfp = None
 
         if self.use_diskcache is True:
@@ -358,7 +359,7 @@ class TarReader(ArchiveReader):
                 future = self.pexecutor.submit(self._prepare_diskcache, srcpath, self.tmpdir)
                 self.diskcache_owner = True
             else: # すでにディスクキャッシュがある場合
-                print('TarReaderのディスクキャッシュを流用します')
+                logger.debug('TarReaderのディスクキャッシュを流用します')
                 self.tmpdir = TarReader.diskcachedict[srcpath]
                 self.diskcache_owner = False
                 
@@ -367,7 +368,7 @@ class TarReader(ArchiveReader):
     def __del__(self):
         if hasattr(self, 'tmpdir') and self.tmpdir is not None:
             if hasattr(self, 'diskcache_owner') and self.diskcache_owner == True:
-                print('TarReaderの一時ディレクトリをクリーンアップします')
+                print('clean up section')
                 self.tmpdir.cleanup()
         if hasattr(self, 'pexecutor') and self.pexecutor is not None:
             self.pexecutor.shutdown()
@@ -421,9 +422,11 @@ class TarReader(ArchiveReader):
     def _prepare_diskcache(srcpath, tmpdir):
         ''' 読み込み用のディスクキャッシュを準備する '''
         import tarfile
+        from ..logger import get_default_logger
+        logger = get_default_logger()
         try:
             with tarfile.open(name=srcpath, mode='r') as tfp:
-                print('TarReaderのディスクキャッシュを作成します:', tmpdir.name)
+                logger.debug('TarReaderのディスクキャッシュを作成します: ' + tmpdir.name)
                 tfp.extractall(path=tmpdir.name)
         except:
             import traceback
@@ -500,11 +503,6 @@ class Cifar10Reader(SrcReader):
             for i in range(10000):
                 nalemlist.append(datadict[b'filenames'][i])
 
-        #batchlist = self.tarreader.arclist()
-        #namelist = []
-        #for batch in batchlist:
-        #    for i in range(10000):
-        #        namelist.append(batch + '-' + str(i+1))
         return namelist
 
     def _load_data(self):

@@ -119,11 +119,6 @@ class NPYDataSet(DataSet):
         self.nrdfuture = None
         self.nrddone = False
         self.nrdfuture = self.texecutor.submit(self._create_namereaderdict, self.namelist, self.readers)
-
-        #self.namelist_flat = []
-        #for sublist in self.namelist:
-        #    self.namelist_flat.extend(sublist)
-
         # disk cacheの設定
         self.use_diskcache = False
         self.tempdir = None
@@ -162,15 +157,18 @@ class NPYDataSet(DataSet):
     def _create_tempdir(self):
         ''' テンポラリディレクトリを作成する '''
         from tempfile import TemporaryDirectory
+        from ..logger import get_default_logger
+
+        logger = get_default_logger()
 
         if not self.srclist[0] in NPYDataSet.diskcachedict:
             if self.tempdir is None:
-                print('NPYDataSetのディスクキャッシュを作成します')
+                logger.debug('NPYDataSetのディスクキャッシュを作成します')
                 self.tempdir = TemporaryDirectory()
                 NPYDataSet.diskcachedict[self.srclist[0]] = self.tempdir
                 self.tempdir_owner = True
         else:
-            print('NPYDataSetのディスクキャッシュを流用します')
+            logger.debug('NPYDataSetのディスクキャッシュを流用します')
             self.tempdir = NPYDataSet.diskcachedict[self.srclist[0]]
             self.tempdir_owner = False
 
@@ -206,6 +204,10 @@ class NPYDataSet(DataSet):
 
     def _obtain_name(self, name):
         ''' obtain_minibatch の個々のデータを取得する '''
+
+        from ..logger import get_default_logger
+        logger = get_default_logger()
+
         datadict = None
         # まず、ディスクキャッシュを探す
         if self.use_diskcache:
@@ -227,9 +229,9 @@ class NPYDataSet(DataSet):
                     data = reader.getbyname(name)
                     obtained = True
                     if trycount >= 2:
-                        print(trycount, '回で読み込み成功しました')
+                        logger.debug(str(trycount) + '回で読み込み成功しました')
                 except:
-                    print('データ読み込みに失敗したため、リトライします trycount=', trycount)
+                    logger.warning('データ読み込みに失敗したため、リトライします trycount = '+ str(trycount))
             datadict = self.labelfunc(name, data)
             if self.use_diskcache: # ディスクキャッシュに保存する
                 future = self.pexecutor.submit(self._save_pickle, datadict, path)

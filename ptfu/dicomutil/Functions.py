@@ -12,6 +12,8 @@ _shiftcache = {}
 def bitconvert(dcmdata, verbose=False):
     ''' BitsStoredが16でないDICOMデータを16ビットにコンバートする 
     与えられたdcmdataには破壊的操作が行われ、dcmdata自体が返り値になる '''
+    from ..logger import get_default_logger
+    logger = get_default_logger()
     if dcmdata.BitsStored == 16:
         return dcmdata
 
@@ -20,16 +22,16 @@ def bitconvert(dcmdata, verbose=False):
     represent = dcmdata.data_element('PixelRepresentation').value # 1: signed 0: unsigned
     signed = (represent == 1)
     if verbose:
-        print('Shape:', dcmdata.Rows, 'x', dcmdata.Columns, dcmdata.Rows * dcmdata.Columns, 'pixels')
+        logger.debug('Shape:' +  str(dcmdata.Rows) +  'x' + str(dcmdata.Columns) + ' ' + str(dcmdata.Rows * dcmdata.Columns) + ' pixels')
         t = 'Signed' if represent == 1 else 'Unsigned'
-        print('PixelRepresentation:', represent, '(', t, ')')
-        print('BitsAllocated:', dcmdata.BitsAllocated)
-        print('BitsStored:', dcmdata.BitsStored)
-        print('HighBit:', dcmdata.HighBit)
+        logger.debug('PixelRepresentation:' +  str(represent) +  ' (' + str(t) + ')')
+        logger.debug('BitsAllocated:' + str(dcmdata.BitsAllocated))
+        logger.debug('BitsStored:' +  str(dcmdata.BitsStored))
+        logger.debug('HighBit:' + str(dcmdata.HighBit))
         e = 'LittleEndian' if littleendian else 'BigEndian'
-        print('Endian:', e)
+        logger.debug('Endian: ' +  e)
         p = dcmdata.PixelData
-        print('PixelData:', type(p), ';', len(p))
+        logger.debug('PixelData: ' +  str(type(p)) +  '; ' +  str(len(p)))
 
     shift_bits = dcmdata.BitsAllocated - dcmdata.HighBit - 1
     shape = (dcmdata.Rows, dcmdata.Columns)
@@ -38,7 +40,7 @@ def bitconvert(dcmdata, verbose=False):
     pixeldata = dcmdata.PixelData
     if(len(pixeldata) > expected):
         if verbose:
-            print('PixelDataの長さが本来よりも長すぎるので、truncateします。 expected =', expected, 'actual =', len(pixeldata))
+            logger.debug('PixelDataの長さが本来よりも長すぎるので、truncateします。 expected = ' +  str(expected) +  ', actual = ' + str(len(pixeldata)))
         dcmdata.PixelData = pixeldata[0:expected] # ok
 
     if shift_bits > 0:
@@ -49,7 +51,7 @@ def bitconvert(dcmdata, verbose=False):
                     shift = _shiftcache[key]
                 else:
                     if verbose:
-                        print('shift cacheにないシフトが検出されました:', key)
+                        logger.debug('shift cacheにないシフトが検出されました: ' +  str(key))
                     shift = np.full(shape, shift_bits, dtype=np.int16)
                     _shiftcache[key] = shift
                 lefted = np.left_shift(dcmdata.pixel_array, shift)

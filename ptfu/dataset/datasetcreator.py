@@ -41,7 +41,7 @@ class DatasetCreator:
         if dststoretype is not None and dstpath is not None and datasetname is not None:
             self.dstwriter = DstWriter(dststoretype, dstpath, datasetname)
 
-        self.logfunc = None
+        #self.logfunc = None
 
         self.executor = ThreadPoolExecutor()
         return
@@ -56,27 +56,29 @@ class DatasetCreator:
         self.dstwriter.setSplitByGroupNumber(n)
         return
 
-    def setlogfunc(self, func):
-        ''' ロギング用の関数を設定する '''
-        self.logfunc = func
+    #def setlogfunc(self, func):
+    #    ''' ロギング用の関数を設定する '''
+    #    self.logfunc = func
         
-    def log(self, *args):
-        ''' ログを出力する 特別なlogfuncが設定されていない場合は組み込みのprintを使用する'''
-        logfunc = None
-        if self.logfunc is None:
-            logfunc = print
-        else:
-            logfunc = self.logfunc
+    #def log(self, *args):
+    #    ''' ログを出力する 特別なlogfuncが設定されていない場合は組み込みのprintを使用する'''
+    #    logfunc = None
+    #    if self.logfunc is None:
+    #        logfunc = print
+    #    else:
+    #        logfunc = self.logfunc#
 
-        content = ''
-        for i in args:
-            content += str(i)
-        logfunc(content)
-        return
+    #    content = ''
+    #    for i in args:
+    #        content += str(i)
+    #    logfunc(content)
+    #    return
 
     def create(self, filter_func=None):
         ''' 設定をfixしてデータセット作成を行う '''
         from concurrent.futures import wait
+        from ..logger import get_default_logger
+        logger = get_default_logger()
 
         # writerの設定をfixする
         self.dstwriter.setup(self.srcreader, filter_func)
@@ -85,20 +87,19 @@ class DatasetCreator:
         ndata = self.srcreader.datanumber()
 
         # 設定を表示する
-        self.log('データセット作成を開始します。')
-        self.log('元データのパス: ', self.srcreader.srcpath)
-        self.log('元データのアーカイブ形式: ', self.srcreader.storetype.name)
-        self.log('元データのデータ形式: ', self.srcreader.datatype.name)
-        self.log('作成するデータセットのパス: ', self.dstwriter.dstpath)
-        self.log('作成するデータセットのアーカイブ形式: ', self.dstwriter.storetype.name)
-        self.log('作成するデータセットファイルの個数: ', self.dstwriter.ngroups)
-        self.log('データセット名: ', self.dstwriter.basename)
-        self.log('検出されたデータ件数: ', ndata)
+        logger.log('データセット作成を開始します。')
+        logger.log('元データのパス: ' + str(self.srcreader.srcpath))
+        logger.log('元データのアーカイブ形式: ' + self.srcreader.storetype.name)
+        logger.log('元データのデータ形式: ' + self.srcreader.datatype.name)
+        logger.log('作成するデータセットのパス: ' + self.dstwriter.dstpath)
+        logger.log('作成するデータセットのアーカイブ形式: ' +  self.dstwriter.storetype.name)
+        logger.log('作成するデータセットファイルの個数: ' + str(self.dstwriter.ngroups))
+        logger.log('データセット名: ' + self.dstwriter.basename)
+        logger.log('検出されたデータ件数: ' + str(ndata))
 
-        self.log('##############################')
+        logger.log('##############################')
         
         # データセット作成開始
-        #writefunc = lambda x: x.appendNext()
 
         nwritten = 0
         writebatch = 100
@@ -112,13 +113,7 @@ class DatasetCreator:
             for future in futures:
                 future.result(1) # 例外が発生していればここで送出される
             nwritten += nextnwrite
-            self.log(nwritten, '件まで作成しました。')
+            logger.log(str(nwritten) +  '件まで作成しました。')
 
-        #for counter in range(ndata):
-        #    
-        #    self.dstwriter.appendNext()
-        #    if counter % 100 == 0 and counter > 0:
-        #        self.log(counter, '件まで作成しました。')
-
-        self.log('データセット作成が終了しました。')
+        logger.log('データセット作成が終了しました。')
         return

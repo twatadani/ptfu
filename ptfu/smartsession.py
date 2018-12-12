@@ -49,6 +49,10 @@ class SmartSession:
 
     def __enter__(self):
         '''with構文を使ってSessionを開く'''
+        from . import logger
+
+        # loggerを取得
+        logger = logger.get_default_logger()
 
         # Sessionを作成
         self.session = tf.Session(config = self.tfconfig.create_configproto())
@@ -77,7 +81,7 @@ class SmartSession:
                     chkp_loaded = True
                     self.last_global_step = self.session.run(self.gstep_tensor)
             except:
-                print('チェックポイントの自動復元に失敗しました。新しく学習を開始します。')
+                logger.info('チェックポイントの自動復元に失敗しました。新しく学習を開始します。')
                 chkp_loaded = False
         
         if not chkp_loaded: # 再開しない設定、または読み込めなかったとき

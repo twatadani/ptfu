@@ -118,6 +118,9 @@ class DstWriter:
 
     def appendNext(self):
         ''' iteratorから得た1件のデータを書き込む '''
+        from ..logger import get_default_logger
+        logger = get_default_logger()
+
         if self.fixed == False:
             raise ValueError('Dstwriter is not fixed when appendNext called.')
 
@@ -130,8 +133,8 @@ class DstWriter:
                     ndarray = future.result()
                 except:
                     import traceback
-                    print('警告: DstWriter.appendNextで例外発生: ただしexecutorを使わない方法でリカバーを試みます。')
-                    traceback.print_exc()
+                    logger.warning('DstWriter.appendNextで例外発生: ただしexecutorを使わない方法でリカバーを試みます。')
+                    logger.warning(traceback.format_exc())
                     ndarray = self.filterfunc(ndarray)
             else:
                 ndarray = self.filterfunc(ndarray)
