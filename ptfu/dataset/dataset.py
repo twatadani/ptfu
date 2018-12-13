@@ -66,6 +66,11 @@ class DataSet:
         の形式 '''
         raise NotImplementedError
 
+    def datanumber(self):
+        ''' このデータセットのデータ数を得る '''
+        raise NotImplementedError
+        
+
     def toDataSetInfo(self):
         ''' このオブジェクトをDataSetInfoに変換する '''
         dic = {}
@@ -137,6 +142,13 @@ class NPYDataSet(DataSet):
         if self.pexecutor is not None:
             self.pexecutor.shutdown()
         return
+
+    def datanumber(self):
+        ''' このデータセットのデータ数を得る '''
+        num = 0
+        for reader in self.readers:
+            num += reader.datanumber()
+        return num
 
     @staticmethod
     def _create_namereaderdict(namelist, readers):
@@ -253,11 +265,39 @@ class NPYDataSet(DataSet):
         
         datadictlist = tuple(datadicts)
         minibatchdict = {}
+        
         for key in keys:
-            mapped = map(lambda x: x[key], datadictlist)
-            listed = tuple(mapped)
-            minibatchdict[key] = np.concatenate(listed, axis=0)
+            listed = None
+            for elementdict in datadictlist:
+                element = elementdict[key]
+                if isinstance(element, np.ndarray):
+                    if listed is None:
+                        listed = element
+                    else:
+                        listed = np.concatenate([listed, element], axis=0)
+                else:
+                    listed = NPYDataSet._flatextend(listed, element)
+            minibatchdict[key] = listed
+
         return minibatchdict
+
+    @staticmethod
+    def _flatextend(elem1, elem2):
+        ''' elem1, elem2を結合してフラットなリストにする '''
+        baselist = []
+        if elem1 is not None:
+            if isinstance(elem1, list):
+                baselist = elem1
+            else:
+                baselist = [ elem1 ]
+                # この時点でbaselistは必ずlist
+                
+        if elem2 is not None:
+            if isinstance(elem2, list):
+                baselist.extend(elem2)
+            else:
+                baselist.append(elem2)
+        return baselist
 
 class TFRecordDataSet(DataSet):
     ''' TFRecord形式のデータセット '''
@@ -305,12 +345,98 @@ class TFRecordDataSet(DataSet):
             parseddict[l] = tf.io.decode_row(value, out_type = dtype)
         return parseddict
         
-                                               
-        
 
-                                                
+class PILDataSet(DataSet):
+    ''' PILでロードできるフォーマットで格納されたデータセット '''
+
+    def __init__(self, srclist, labellist, labelstyle, datatype, **options):
+        ''' PILDataSetのイニシャライザ
+        srclist: データセット格納ファイルのリスト
+        labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
+        labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
+        datatype: 具体的なデータタイプ。DataType enumから選択する
+        options内に
+        storetype: StoreTypeメンバ、
+        labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)となるような
+        storetype, labelfuncが必須 '''
+        from . import SrcReader, DataType
+        super(PILDataSet, self).__init__(srclist, labellist, labelstyle, **options)
+
+        self.readers = []
+        self.datatype = datatype
+        for srcfile in self.srclist:
+            reader = SrcReader(datatype, options['storetype'], srcfile)
+            self.readers.append(reader)
+
+        assert 'labelfunc' in options
+        self.labelfunc = options['labelfunc']
+        return
+
+    def datanumber(self):
+        ''' このデータセットのデータ数を得る '''
+        num = 0
+        for reader in self.readers:
+            num += reader.datanumber()
+        return num
+
+    def obtain_minibatch(self, minibatchsize):
+        ''' minibatchsizeで指定されたサイズのミニバッチを取得する。
+        ミニバッチデータは
+        { label1: (minibatchsize, ....), label2: (minibatchsize, ....) }
+        の形式 '''
+        raise NotImplementedError
+
+    def obtain_wholedata(self):
+        ''' すべてのデータを取得する。返り値は
+        { label1: (minibatchsize, ...), label2: (minibatchsize, ...) }
+        の辞書形式 '''
+        datadict = None
+
+        for reader in self.readers:
+            iterator = reader.iterator()
+            for name, npy in iterator:
+                singledict = self.labelfunc(name, npy)
+                #assert singledict is not None
+                if datadict is None:
+                    datadict = singledict
+                else:
+                    datadict = NPYDataSet._mergedict([datadict, singledict], datadict.keys())
+
+        return datadict
+
+class JPGDataSet(PILDataSet):
+    ''' JPEG画像が格納されているデータセット '''
+
+    def __init__(self, srclist, labellist, labelstyle, **options):
+        ''' JPGDataSetのイニシャライザ
+        srclist: データセット格納ファイルのリスト
+        labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
+        labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
+        options内に
+        storetype: StoreTypeメンバ、
+        labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)となるような
+        storetype, labelfuncが必須 '''
+        from . import DataType
+        super(JPGDataSet, self).__init__(srclist, labellist, labelstyle, DataType.JPG, **options)
+        return
+
+class PNGDataSet(PILDataSet):
+    ''' PNG画像が格納されているデータセット '''
+
+    def __init__(self, srclist, labellist, labelstyle, **options):
+        ''' PNGDataSetのイニシャライザ
+        srclist: データセット格納ファイルのリスト
+        labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
+        labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
+        datatype: 具体的なデータタイプ。DataType enumから選択する
+        options内に
+        storetype: StoreTypeメンバ、
+        labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)となるような
+        storetype, labelfuncが必須 '''
+        from . import DataType
+        super(PNGDataSet, self).__init__(srclist, labellist, labelstyle, DataType.PNG, **options)
+        return
 
 
 
 
-        

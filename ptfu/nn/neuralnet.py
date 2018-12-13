@@ -186,12 +186,7 @@ class NNLayer:
 
     def gettype(self):
         ''' このlayerのタイプ (conv2d, denseなど)を返す '''
-        #from ..logger import get_default_logger
-        #logger = get_default_logger()
-        #logger.debug(str(type(self.tflayer)))
-        #logger.debug(self.tflayer.__name__)
         return self.tflayer.__name__
-        #return type(self.tflayer)
 
     def output_tensor(self):
         ''' このlayerの出力tensorを返す '''

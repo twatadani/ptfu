@@ -35,7 +35,8 @@ class SingleNetworkModel(Model):
         assert isinstance(neural_network, NeuralNet) # 型チェック
         self.nn = neural_network
         self.loss = lossfunc
-        summary.scalar(name = 'Loss', tensor = self.loss)
+        if self.loss is not None:
+            summary.scalar(name = 'Loss', tensor = self.loss)
         self.optimizer = optimizer
         self.training = None # マルチプロセスモデルに従い、trainingはmultiprocessing.Queueに変更。
         return
@@ -93,8 +94,6 @@ class SingleNetworkModel(Model):
                 executor.submit(self._qloop, datasetinfo, self.trainq, self.qthreashold,
                                 self.qbatchsize, minibatchsize, self.training)
         
-        # 計算グラフを定義する
-        #self.nn.define_network()
         train_op = self.optimizer.minimize(self.loss, global_step = self.global_step_tensor())
 
         # Tensorflowのコンフィグ
@@ -171,19 +170,35 @@ class SingleNetworkModel(Model):
             logger.error(traceback.format_exc())
         return
 
+    def forward_wholedataset(self, dataset, tfconfig, fdmapper,
+                             session=None, checkpoint_dir=None):
+        ''' 学習後のモデルに対して検証用データセットのすべてを与え、forward propagationを行う。
+        学習後モデルはsessionが与えられた場合はそのsessionが、checkpoint_dirが与えられた場合は
+        checkpoint_dirの最新checkpointが用いられる。
+        すでにsessionがある場合は引数のtfconfigは使用されない。
+        fdmapperはtrainと同じ形式。
+        返り値はこのモデルが保有するneural networkのoutput_tensorsがkey、
+        それらに対する値のリストがvalueとなった辞書形式'''
+        import tensorflow as tf
+        from ptfu import SmartSession
+
+        output_tensors = self.nn.get_output_tensors()
+
+        wholebatch = dataset.obtain_wholedata()
+        fd = self._create_fd(wholebatch, fdmapper)
+
+        if session is None:
+            last_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
+            if last_checkpoint is not None:
+                with SmartSession(tfconfig) as session:
+                    saver = tf.train.Saver()
+                    saver.restore(session.session, save_path=last_checkpoint)
+                    result = session.run(output_tensors, feed_dict=fd)                    
+            else:
+                raise ValueError('latest checkpoint cannot be found. search dir=' + checkpoint_dir)
+        else:
+            result = session.run(output_tensors, feed_dict=fd)
 
 
-    def validate(self, **options):
-        ''' 訓練したモデルに検証用データを与えて検証を行う。与えるパラメータ:
-        dataset: 検証用データセット。DataSetオブジェクト '''
-        if self.training:
-            # 学習中はvalidationは走らせない
-            raise ValueError
-        return
-        
-        
-        
-
-    
-    
+        return result
         

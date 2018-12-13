@@ -56,24 +56,6 @@ class DatasetCreator:
         self.dstwriter.setSplitByGroupNumber(n)
         return
 
-    #def setlogfunc(self, func):
-    #    ''' ロギング用の関数を設定する '''
-    #    self.logfunc = func
-        
-    #def log(self, *args):
-    #    ''' ログを出力する 特別なlogfuncが設定されていない場合は組み込みのprintを使用する'''
-    #    logfunc = None
-    #    if self.logfunc is None:
-    #        logfunc = print
-    #    else:
-    #        logfunc = self.logfunc#
-
-    #    content = ''
-    #    for i in args:
-    #        content += str(i)
-    #    logfunc(content)
-    #    return
-
     def create(self, filter_func=None):
         ''' 設定をfixしてデータセット作成を行う '''
         from concurrent.futures import wait

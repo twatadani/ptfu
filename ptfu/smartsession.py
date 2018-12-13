@@ -167,12 +167,7 @@ class SmartSession:
     def run_hooks(self, global_step, feed_dict=None, options=None, run_metadata=None):
 
         for hook in self.hooks:
-            #if hook.tensorlist is None or len(hook.tensorlist) == 0:
-            #    noarg = True
-            #else:
-            #    noarg = False
 
-            #if not noarg:
             tensorvaluedic = {}
             if len(hook.tensorlist) > 0:
                 values = self.session.run(hook.tensorlist, feed_dict, options, run_metadata)
@@ -183,14 +178,8 @@ class SmartSession:
 
             if hook.mod == global_step % hook.step:
                 if hook.sync:
-                    # if noarg:
-                    #     hook()
-                    #else:
                     hook(tensorvaluedic)
                 else:
-                    #if noarg:
-                    #    future = self.executor.submit(hook)
-                    #else:
                     future = self.executor.submit(hook, tensorvaluedic)
         return
 

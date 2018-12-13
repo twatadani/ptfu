@@ -4,13 +4,13 @@ from .datatype import DataType, StoreType
 from .srcreader import SrcReader, Cifar10Reader
 from .dstwriter import DstWriter
 from .datasetcreator import DatasetCreator
-from .dataset import TFRecordDataSet, NPYDataSet, LabelStyle
+from .dataset import TFRecordDataSet, NPYDataSet, PILDataSet, JPGDataSet, PNGDataSet, LabelStyle
 
 # DICOMは例外なのでgetextを定義しなおす
 DataType.DICOM.getext = (lambda self: 'dcm')
 
 # 各メンバに対してreader関数を設定する
-from .srcreader import JPGReader, PNGReader, DICOMReader, NPYReader
+from .srcreader import JPGReader, PNGReader, DICOMReader, NPYReader, PILReader
 # singleton instances
 pngreader = PNGReader()
 jpgreader = JPGReader()

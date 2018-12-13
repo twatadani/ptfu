@@ -39,7 +39,7 @@ class DstWriter:
         return
 
     def __del__(self):
-        if hasattr(self, executor) and self.executor is not None:
+        if hasattr(self, 'executor') and self.executor is not None:
             self.executor.shutdown()
 
     def setup(self, srcreader, filterfunc=None):
@@ -58,7 +58,6 @@ class DstWriter:
                 ncpu = f.cpu_count()
                 maxprocess = max(1, ncpu-1)
                 self.executor = ProcessPoolExecutor(maxprocess)
-                print('DstWriterのexecutorをProcessPoolExecutorに設定しました。maxprocess=', maxprocess)
             else:
                 self.executor = ThreadPoolExecutor(1)
 
@@ -274,7 +273,6 @@ class ZipWriter(StoreTypeWriter):
 
     def open_dst(self):
         ''' アーカイブのオープン ZipWriterではzipアーカイブのオープンを行う '''
-        print('ZipWriter open_dst called.')
         if self.zfp is None:
             parent_dir = os.path.dirname(self.dstpath)
             if not os.path.exists(parent_dir):
@@ -284,7 +282,6 @@ class ZipWriter(StoreTypeWriter):
 
     def close_dst(self):
         ''' アーカイブのクローズ ZipWriterではzipアーカイブのクローズを行う '''
-        print('ZipWriter close_dst called.')
         if self.zfp is not None:
             self.zfp.close()
             self.zfp = None
@@ -293,8 +290,6 @@ class ZipWriter(StoreTypeWriter):
         ''' iteratorから得た1件のデータを書き込む '''
         buf = BytesIO()
         np.save(buf, ndarray, allow_pickle=False)
-        print('self.writestarted=', self.writestarted)
-        print('self.zfp: ', self.zfp)
         self.zfp.writestr(name + '.npy', buf.getbuffer())
         buf.close()
         return
