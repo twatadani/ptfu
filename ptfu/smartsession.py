@@ -44,6 +44,8 @@ class SmartSession:
 
         if len(initial_hooks) > 0:
             self.registerHooks(initial_hooks)
+
+        self.last_fetches = None
         return
         
 
@@ -142,10 +144,13 @@ class SmartSession:
                        options=options, run_metadata=run_metadata)
 
         # 自動で追加した対象を削除して呼び出し側に結果を返す
+        # self.last_fetctesに結果を保存する
+        
         if is_fetch_list:
-            return result[0:gstep_idx]
+            self.last_fetches = result[0:gstep_idx]
         else:
-            return result[0]
+            self.last_fetches =  result[0]
+        return self.last_fetches
 
     def registerHooks(self, hook_list):
         '''step counter毎のhookを登録する
@@ -162,7 +167,10 @@ class SmartSession:
     def get_global_step(self):
         ''' 最新のglobal stepの値を返す '''
         return self.last_global_step
-
+    
+    def get_last_fetches(self):
+        ''' 最新のrunの結果を返す '''
+        return self.last_fetches
 
     def run_hooks(self, global_step, feed_dict=None, options=None, run_metadata=None):
 

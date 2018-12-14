@@ -59,6 +59,39 @@ class MaxGlobalStepFlag(EndFlag):
         s += '.'
         return s
 
+class LossNaNEndFlag(EndFlag):
+    ''' loss関数がnanになったときに終了する条件 '''
+
+    def __init__(self, loss_tensor, ncontinue=5):
+        ''' loss_tensor: モニターするロス関数のtensor
+        ncontinue: 何ステップ連続でnanになったら終了するか '''
+        
+        self.losslist = []
+        self.losstensor = loss_tensor
+        self.ncontinue = ncontinue
+
+    def should_end(self):
+        ''' 学習を終了すべきか返す '''
+        import math
+        # まず、 losslistを更新する
+        newloss = self.smartsession.get_last_fetches[self.losstensor]
+        self.losslist.append(newloss)
+        if len(self.losslist) > self.ncontinue:
+            self.losslist = self.losslist[1:]
+
+        for loss in self.losslist:
+            if not math.isnan(loss): # いずれか一つでもNaNでなければ、終了しない
+                return False
+        return True
+
+    def reason(self):
+        ''' 学習終了の理由 '''
+        if not self.should_end():
+            return 'LossNaNEndFlag: 終了条件に該当しません。'
+        else:
+            return str(ncontinue) + '回連続で損失関数がNaNとなったため'
+        
+
 class AndEndFlag(EndFlag):
     ''' 複数のEndFlagの&演算子による複合判定 '''
 
@@ -70,6 +103,10 @@ class AndEndFlag(EndFlag):
     def should_end(self):
         ''' 学習を終了すべきか返す '''
         return self.flag1.should_end() & self.flag2.should_end()
+
+   def setSmartSession(self, smartsession):
+       self.flag1.setSmartSession(smartsession)
+       self.flag2.setSmartSession(smartsession)
 
     def reason(self):
         ''' 学習終了の理由 '''
@@ -87,6 +124,10 @@ class OrEndFlag(EndFlag):
     def should_end(self):
         ''' 学習を終了すべきか返す '''
         return self.flag1.should_end() | self.flag2.should_end()
+
+   def setSmartSession(self, smartsession):
+       self.flag1.setSmartSession(smartsession)
+       self.flag2.setSmartSession(smartsession)
 
     def reason(self):
         ''' 学習終了の理由 '''
