@@ -59,27 +59,38 @@ class MaxGlobalStepFlag(EndFlag):
         s += '.'
         return s
 
-class LossNaNEndFlag(EndFlag):
+class TensorValueEndFlag(EndFlag):
+    ''' 特定の1つのTensorの値を使って終了判定を行う終了条件
+    このクラスはabstract class '''
+    
+    def __init__(self, tensor, ncontinue = 5):
+        ''' ncontinue: 何回分の値を使うか '''
+        super(TensorValueEndFlag, self).__init__(self)
+        self.tensor = tensor
+        self.lastvalues = []
+
+    def update_lastvalues(self):
+        lastvalue = self.smartsession.get_last_fetches[self.tensor]
+        self.lastvalues.append(lastvalue)
+        if len(self.lastvalues) > self.ncontinue:
+            self.lastvalues = self.lastvalues[(len(self.lastvalues)-self.ncontinue):]
+        return
+
+class LossNaNEndFlag(TensorValueEndFlag):
     ''' loss関数がnanになったときに終了する条件 '''
 
     def __init__(self, loss_tensor, ncontinue=5):
         ''' loss_tensor: モニターするロス関数のtensor
         ncontinue: 何ステップ連続でnanになったら終了するか '''
-        
-        self.losslist = []
-        self.losstensor = loss_tensor
-        self.ncontinue = ncontinue
+        super(LossNaNEndFlag, self).__init__(self, loss_tensor, ncontinue)
 
     def should_end(self):
         ''' 学習を終了すべきか返す '''
         import math
-        # まず、 losslistを更新する
-        newloss = self.smartsession.get_last_fetches[self.losstensor]
-        self.losslist.append(newloss)
-        if len(self.losslist) > self.ncontinue:
-            self.losslist = self.losslist[1:]
+        # まず、 lossのリストを更新する
+        self.update_lastvalues()
 
-        for loss in self.losslist:
+        for loss in self.lastvalues:
             if not math.isnan(loss): # いずれか一つでもNaNでなければ、終了しない
                 return False
         return True
@@ -90,7 +101,34 @@ class LossNaNEndFlag(EndFlag):
             return 'LossNaNEndFlag: 終了条件に該当しません。'
         else:
             return str(ncontinue) + '回連続で損失関数がNaNとなったため'
+
+class TensorSmallerEndFlag(TensorValueEndFlag):
+    ''' あるtensorの値が一定より下回ったら終了する条件 '''
+
+    def __init__(self, tensor, threshold, ncontinue=5):
+        ''' tensor: 監視するtensor
+        threshold: この値を下回ったら終了
+        ncontinue: 最新n回の平均値をthresholdと比較する '''
         
+        super(TensorSmallerEndFlag, self).__init__(self, tensor, ncontinue)
+        self.threshold = threshold
+
+    def should_end(self):
+        self.update_lastvalues()
+
+        return self.calculate_tensorsum() <= threshold * ncontinue
+        
+    def calculate_tensorsum(self):
+        tensorsum = 0
+        for tensorvalue in self.lastvalues:
+            tensorsum += tensorvalue
+        return tensorsum
+
+    def reason(self):
+        if self.should_end():
+            return str(self.tensor) + 'の値が' + str(self.threshold) + '以下となったため。'
+        else:
+            return '終了条件に該当しません。'
 
 class AndEndFlag(EndFlag):
     ''' 複数のEndFlagの&演算子による複合判定 '''
