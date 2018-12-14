@@ -124,6 +124,9 @@ class SingleNetworkModel(Model):
                     fd = self._create_fd(minibatch, fdmapper)
                     session.run(train_op, feed_dict=fd)
 
+            # 終了条件を表示
+            logger.log('学習終了 終了条件: ' + endflag.reason())
+
         self.training.put(True)
         return
 
