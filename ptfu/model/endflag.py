@@ -65,12 +65,15 @@ class TensorValueEndFlag(EndFlag):
     
     def __init__(self, tensor, ncontinue = 5):
         ''' ncontinue: 何回分の値を使うか '''
-        super(TensorValueEndFlag, self).__init__(self)
+        super(TensorValueEndFlag, self).__init__()
         self.tensor = tensor
         self.lastvalues = []
 
     def update_lastvalues(self):
-        lastvalue = self.smartsession.get_last_fetches[self.tensor]
+        last_fetches = self.smartsession.get_last_fetches()
+        if last_fetches is None:
+            return
+        lastvalue = self.smartsession.get_last_fetches()[self.tensor]
         self.lastvalues.append(lastvalue)
         if len(self.lastvalues) > self.ncontinue:
             self.lastvalues = self.lastvalues[(len(self.lastvalues)-self.ncontinue):]
@@ -82,13 +85,16 @@ class LossNaNEndFlag(TensorValueEndFlag):
     def __init__(self, loss_tensor, ncontinue=5):
         ''' loss_tensor: モニターするロス関数のtensor
         ncontinue: 何ステップ連続でnanになったら終了するか '''
-        super(LossNaNEndFlag, self).__init__(self, loss_tensor, ncontinue)
+        super(LossNaNEndFlag, self).__init__(loss_tensor, ncontinue)
 
     def should_end(self):
         ''' 学習を終了すべきか返す '''
         import math
         # まず、 lossのリストを更新する
         self.update_lastvalues()
+
+        if len(self.lastvalues) == 0:
+            return False
 
         for loss in self.lastvalues:
             if not math.isnan(loss): # いずれか一つでもNaNでなければ、終了しない
@@ -110,11 +116,14 @@ class TensorSmallerEndFlag(TensorValueEndFlag):
         threshold: この値を下回ったら終了
         ncontinue: 最新n回の平均値をthresholdと比較する '''
         
-        super(TensorSmallerEndFlag, self).__init__(self, tensor, ncontinue)
+        super(TensorSmallerEndFlag, self).__init__(tensor, ncontinue)
         self.threshold = threshold
 
     def should_end(self):
         self.update_lastvalues()
+
+        if len(self.lastvalues) == 0:
+            return False
 
         return self.calculate_tensorsum() <= threshold * ncontinue
         
@@ -142,9 +151,10 @@ class AndEndFlag(EndFlag):
         ''' 学習を終了すべきか返す '''
         return self.flag1.should_end() & self.flag2.should_end()
 
-   def setSmartSession(self, smartsession):
-       self.flag1.setSmartSession(smartsession)
-       self.flag2.setSmartSession(smartsession)
+    def setSmartSession(self, smartsession):
+        self.flag1.setSmartSession(smartsession)
+        self.flag2.setSmartSession(smartsession)
+        return
 
     def reason(self):
         ''' 学習終了の理由 '''
@@ -163,9 +173,10 @@ class OrEndFlag(EndFlag):
         ''' 学習を終了すべきか返す '''
         return self.flag1.should_end() | self.flag2.should_end()
 
-   def setSmartSession(self, smartsession):
-       self.flag1.setSmartSession(smartsession)
-       self.flag2.setSmartSession(smartsession)
+    def setSmartSession(self, smartsession):
+        self.flag1.setSmartSession(smartsession)
+        self.flag2.setSmartSession(smartsession)
+        return
 
     def reason(self):
         ''' 学習終了の理由 '''

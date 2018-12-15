@@ -77,6 +77,11 @@ class LayerBasedNeuralNet(NeuralNet):
         ''' このNeuralNetの最後のlayerを取得する '''
         return self.layers[-1]
 
+    def add_input_layer(self, input_tensor):
+        ''' このNeuralNetにinput layerを設定する '''
+        self.layers.append(NNLayer(input_tensor, input_mode=True))
+        return
+
     def add_layer(self, layer, **options):
         ''' このNeuralNetにレイヤーを追加する。
         layer: Tensorflowのレイヤー 例えばtf.layers.conv2dやtf.layers.denseなど
@@ -125,7 +130,10 @@ class NNLayer:
     def __init__(self, tflayer, **options):
 
         self.tflayer = tflayer
-        self.outtensor = tflayer(**options)
+        if 'input_mode' in options and options['input_mode'] == True:
+            self.outtensor = tflayer
+        else:
+            self.outtensor = tflayer(**options)
 
         if 'name' in options:
             self.name = options['name']
@@ -186,7 +194,10 @@ class NNLayer:
 
     def gettype(self):
         ''' このlayerのタイプ (conv2d, denseなど)を返す '''
-        return self.tflayer.__name__
+        if callable(self.tflayer): # 関数の場合
+            return self.tflayer.__name__
+        else:
+            return self.tflayer.name
 
     def output_tensor(self):
         ''' このlayerの出力tensorを返す '''
