@@ -41,6 +41,10 @@ class SingleNetworkModel(Model):
         self.training = None # マルチプロセスモデルに従い、trainingはmultiprocessing.Queueに変更。
         return
 
+    def get_training_tensor(self):
+        ''' 学習用か検証用かを示すboolean tensorを取得する。設定されていない場合はNoneが返る '''
+        return self.nn.get_training_tensor()
+
     def train(self, **options):
         ''' このモデルを訓練する。与えるパラメータ:
         dataset: 学習用データセット。DataSetオブジェクト
@@ -121,7 +125,7 @@ class SingleNetworkModel(Model):
                 if is_tfrecord:
                     session.run(train_op)
                 else:
-                    fd = self._create_fd(minibatch, fdmapper)
+                    fd = self._create_fd(minibatch, fdmapper, True)
                     session.run(train_op, feed_dict=fd)
 
             # 終了条件を表示
@@ -139,12 +143,14 @@ class SingleNetworkModel(Model):
         else:
             return self.trainq.get()
             
-    @staticmethod
-    def _create_fd(minibatch, fdmapper):
+    def _create_fd(self, minibatch, fdmapper, training):
         ''' ミニバッチデータからfeed_dictを作成する '''
         fd = {}
         for key in fdmapper:
             fd[key] = minibatch[fdmapper[key]]
+        training_tensor = self.get_training_tensor()
+        if training_tensor is not None:
+            fd[training_tensor] = training
         return fd
 
     @staticmethod
@@ -188,7 +194,7 @@ class SingleNetworkModel(Model):
         output_tensors = self.nn.get_output_tensors()
 
         wholebatch = dataset.obtain_wholedata()
-        fd = self._create_fd(wholebatch, fdmapper)
+        fd = self._create_fd(wholebatch, fdmapper, False)
 
         if session is None:
             last_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)

@@ -17,7 +17,9 @@ class NeuralNet:
         elif isinstance(input_tensors, dict): #辞書型の場合
             self.inputs = input_tensors # そのまま使う
         else: # リストでない場合は
-            self.inputs = { input: input_tensors }
+            self.inputs = { 'input': input_tensors }
+
+        self._prepare_training_tensor()
 
         self.name = None
         if network_name is None:
@@ -31,6 +33,18 @@ class NeuralNet:
     def define_network(self):
         ''' ネットワークを定義する。実際には具象クラスで行う。 '''
         raise NotImplementedError
+
+    def _prepare_training_tensor(self):
+        ''' 学習用か検証用かを設定するboolean tensorを設定する '''
+        import tensorflow as tf
+        self.training_tensor = tf.placeholder(dtype=tf.bool,
+                                              shape=(),
+                                              name='training')
+        self.inputs['training'] = self.training_tensor
+        return
+
+    def get_training_tensor(self):
+        return self.training_tensor
 
     def get_input_tensors(self):
         ''' このNeuralNetの入力tensorのリストを得る '''
