@@ -7,7 +7,7 @@ from .datasetcreator import DatasetCreator
 from .dataset import TFRecordDataSet, NPYDataSet, PILDataSet, JPGDataSet, PNGDataSet, LabelStyle
 
 # DICOMは例外なのでgetextを定義しなおす
-DataType.DICOM.getext = (lambda self: 'dcm')
+DataType.DICOM.getext = (lambda : 'dcm')
 
 # 各メンバに対してreader関数を設定する
 from .srcreader import JPGReader, PNGReader, DICOMReader, NPYReader, PILReader
@@ -23,7 +23,7 @@ DataType.DICOM.reader = (lambda : dicomreader)
 DataType.NPY.reader = (lambda : npyreader)
 
 # DIRは拡張子を持たないので、空文字列を返す
-StoreType.DIR.getext = (lambda self: '')
+StoreType.DIR.getext = (lambda self : '')
 
 # readerの実体をenumメンバに与える
 from .srcreader import DirReader, TarReader, ZipReader

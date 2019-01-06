@@ -33,8 +33,6 @@ class SrcReader:
     def iterator(self):
         ''' 個々のデータを読んでゆくイテレータを返すメンバ関数。
         返すデータの型は(データの名前, npy ndarrayで表現された画像データ)のタプル '''
-        print(self.areader)
-        print(self.areader.iterator())
         return self.areader.iterator()
 
     def datanumber(self):
@@ -73,7 +71,7 @@ class TypeReader:
         srcpath: ソースディレクトリのパス
         filename: ファイル名
         srcpath, filenameはos.path.joinで結合するので、srcpathにファイル名まで記述して、filenameが空でも
-        よい。zip, tarとの引数の数をそろえるため2引数関数としている。
+        よい。zip, tarとの引数の数をそろえるため2引数としている。
         arcobj: この関数では使用しない '''
         raise NotImplementedError
 
@@ -107,12 +105,13 @@ class PILReader(TypeReader):
     def __init__(self, datatype):
         super(PILReader, self).__init__(datatype)
 
-    def read_from_rawfile(self, srcpath, filename):
+    def read_from_rawfile(self, srcpath, filename, arcobj):
         ''' 生のディレクトリ内からデータを読み出し、ndarray形式で返す。
         srcpath: ソースディレクトリのパス
         filename: ファイル名
         srcpath, filenameはos.path.joinで結合するので、srcpathにファイル名まで記述して、filenameが空でも
-        よい。zip, tarとの引数の数をそろえるため2引数関数としている。 '''
+        よい。zip, tarとの引数の数をそろえるため2引数としている。 
+        arcobj: この関数では使用しない'''
         
         # 読み込むファイルのフルパス
         fullpath = os.path.join(srcpath, filename)
@@ -146,15 +145,16 @@ class DICOMReader(TypeReader):
         from .datatype import DataType
         super(DICOMReader, self).__init__(DataType.DICOM)
 
-    def read_from_rawfile(self, srcpath, filename):
+    def read_from_rawfile(self, srcpath, filename, arcobj):
         ''' 生のディレクトリ内からデータを読み出し、ndarray形式で返す。
         srcpath: ソースディレクトリのパス
         filename: ファイル名
         srcpath, filenameはos.path.joinで結合するので、srcpathにファイル名まで記述して、filenameが空でも
-        よい。zip, tarとの引数の数をそろえるため2引数関数としている。 '''
+        よい。zip, tarとの引数の数をそろえるため2引数としている。 
+        arcobj: この関数では使用しない'''
         import pydicom
         fullpath = os.path.join(srcpath, filename)
-        return dcm2npy(pydicom.dcmread(fullpath))
+        return self.dcm2npy(pydicom.dcmread(fullpath))
 
     def read_from_bytes(self, bytesio):
         ''' インメモリに読み込まれたBytesIOオブジェクトからデータを読み出し、ndarray形式で返す。 '''
@@ -164,6 +164,8 @@ class DICOMReader(TypeReader):
     def dcm2npy(self, dcmdataset, dtype=np.float32):
         ''' pydicom datasetからnumpyに変換する '''
         # pydicomの読み込みは完全でないので、データを変換する
+        import ptfu.dicomutil as dicomutil
+
         converted = dicomutil.bitconvert(dcmdataset)
         interarray = None
         if converted.PixelRepresentation == 0: # unsigned
@@ -187,12 +189,13 @@ class NPYReader(TypeReader):
         from .datatype import DataType
         super(NPYReader, self).__init__(DataType.NPY)
 
-    def read_from_rawfile(self, srcpath, filename):
+    def read_from_rawfile(self, srcpath, filename, arcobj):
         ''' 生のディレクトリ内からデータを読み出し、ndarray形式で返す。
         srcpath: ソースディレクトリのパス
         filename: ファイル名
         srcpath, filenameはos.path.joinで結合するので、srcpathにファイル名まで記述して、filenameが空でも
-        よい。zip, tarとの引数の数をそろえるため2引数関数としている。 '''
+        よい。zip, tarとの引数の数をそろえるため2引数としている。 
+        arcobj: この関数では使用しない '''
         fullpath = os.path.join(srcpath, filename)
         return np.load(fullpath)
 

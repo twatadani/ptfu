@@ -1,8 +1,5 @@
 ''' Personal TensorFlow Utility dicomutil サブパッケージ: DICOM関連ユーティリティ '''
 
-from . import Functions
-
-#from . import TFConfig
-#from . import SmartSession
+from .Functions import bitconvert
 
 name = 'ptfu.dicomutil'
