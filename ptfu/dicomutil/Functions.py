@@ -1,5 +1,7 @@
 ''' Functions.py DICOMユーティリティにおけるユーティリティー関数群 '''
 
+import numpy as np
+
 def arithmetic_rshift(x, shift_bits):
     ''' 算術右シフト '''
     if x >= 0:

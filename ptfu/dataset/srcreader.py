@@ -420,7 +420,8 @@ class TarReader(ArchiveReader):
             if self.use_diskcache: # まずディスクキャッシュを探す
                 fullname = os.path.join(self.tmpdir.name, name)
                 if os.path.exists(fullname):
-                    return treader.read_from_rawfile(self.tmpdir.name, name)
+                    arcobj = self.open_src()
+                    return treader.read_from_rawfile(self.tmpdir.name, name, arcobj)
 
             # キャッシュヒットしなかった場合 親クラスの実装を使う
             return super(TarReader, self).getbyname(name, treader)
