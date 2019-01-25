@@ -30,8 +30,11 @@ class NeuralNet:
         self.outputs = {}
         return
 
-    def define_network(self):
-        ''' ネットワークを定義する。実際には具象クラスで行う。 '''
+    def define_network(self, devices, input_tensors):
+        ''' ネットワークを定義する。実際には具象クラスで行う。 
+        devicesにはこのネットワークで使用するデバイスのリストが与えられる
+        input_tensorsは並列実行などで適切に分割されたinputが与えられる。
+        この関数は実際にはModelのインスタンスから呼ばれるため、ライブラリユーザーは通常使用する必要はない '''
         raise NotImplementedError
 
     def _prepare_training_tensor(self):

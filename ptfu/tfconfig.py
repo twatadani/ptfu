@@ -4,7 +4,8 @@ class TFConfig:
     ''' Tensorflowの動作設定を保存するクラス '''
 
     # class constant
-    CPU = '/cpu:0'
+    CPU = '/CPU:0'
+    XLA_CPU = '/XLA_CPU:0'
 
     def __init__(self, **kwargs):
         ''' TFConfig イニシャライザ
@@ -18,6 +19,7 @@ class TFConfig:
         checkpoint_save_interval: 自然数 # Checkpointを保存する間隔。単位はglobal step。デフォルトは1000
         summarydir: パス文字列 # summary, checkpointを保存するディレクトリ
         use_autoreload: True or False # 学習中断したときにcheckpointを読み込んで学習を再開するかどうか。デフォルトはTrue
+        use_xla: XLA JITコンパイルを使用するかどうか
         '''
 
         # GPU関係の設定
@@ -68,6 +70,13 @@ class TFConfig:
         if 'use_autoreload' in kwargs:
             self.use_autoreload = kwargs['use_autoreload']
 
+        self.use_xla = False # デフォルト
+        if 'use_xla' in kwargs:
+            self.use_xla = kwargs['use_xla']
+
+        # 並列実行のtowerを構築する
+        self.towers = self._create_towers()
+
         return
 
     def create_configproto(self):
@@ -80,12 +89,17 @@ class TFConfig:
             cp = tf.ConfigProto(
                 gpu_options = gpu_options,
                 allow_soft_placement = True)
+            # XLA JITコンパイルを有効にする(GPUのみ)
+            if self.use_xla:
+                cp.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+
         else:
             # 環境変数でGPUを制限する
             import os
             os.environ['CUDA_VISIBLE_DEVICES'] = ''
             cp = tf.ConfigProto(
                 allow_soft_placement = True)
+
         
         return cp
 
@@ -101,4 +115,43 @@ class TFConfig:
                 strlist += ', '
         return strlist
 
+    def ntowers(self):
+        ''' 並列実行のタワー数を返す '''
+        if not self.use_gpu:
+            return 1
+        else:
+            return self.gpu_parallelism
+
+    def _create_towers(self):
+        ''' 設定された並列実行のtowerリストを作成する。
+        tower = []のリストで、さらにリストの要素の1タワーは利用可能なデバイスのリスト '''
+
+        towers = []
+        for i in range(self.ntowers()):
+            if not self.use_gpu: # CPU学習の場合
+                if self.use_xla: # XLA_CPU
+                    tower = [TFConfig.XLA_CPU]
+                else:
+                    tower = [TFConfig.CPU]
+            else: # GPU学習の場合
+                gpuprefix = '/GPU:'
+                xlaprefix = '/XLA_GPU:'
+                
+                if self_use_xla:
+                    prefix = xlaprefix
+                else:
+                    prefix = gpuprefix
+            
+            ngpu_per_tower = len(self.gpu_list)
+                
+            tw_start = i * ngpu_per_tower
+            tw_end = tw_start + ngpu_per_tower - 1
+            if i == self.ntowers() - 1:
+                tw_end = len(self.gpu_list) - 1
+
+            tower = []
+            for gpunum in self.gpu_list[tw_start:tw_end]:
+                tower.append(prefix + str(gpunum))
+            towers.append(tower)
+        return towers
         
