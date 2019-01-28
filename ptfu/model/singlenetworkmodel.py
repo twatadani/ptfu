@@ -24,12 +24,10 @@ class SingleNetworkModel(Model):
         ''' 学習用か検証用かを示すboolean tensorを取得する。設定されていない場合はNoneが返る '''
         return self.nn.get_training_tensor()
 
-    def prepare_train(self, tfconfig, minibatchsize_per_tower, tf_loss_func, **tf_loss_func_options):
-        ''' パラメータを与えてネットワーク定義、損失関数定義などの学習準備を行う
+    def define_network(self, tfconfig, minibatchsize_per_tower):
+        ''' パラメータを与えてネットワーク定義を行う
         tfconfig: TFConfigオブジェクト
-        minibatchsize_per_tower: ミニバッチサイズ。タワー型並列実行については1タワーあたりの数
-        tf_loss_func: TensorFlowの損失関数
-        **tf_loss_func_options: tf_loss_funcに与えるオプション '''
+        minibatchsize_per_tower: ミニバッチサイズ。タワー型並列実行については1タワーあたりの数 '''
 
         ntowers = tfconfig.ntowers()
         self.minibatchsize = ntowers * minibatchsize_per_tower
@@ -58,7 +56,13 @@ class SingleNetworkModel(Model):
                         for key in output_tensors:
                             output_tensors[key] = tf.concat([output_tensors[key], self.nn.outputs[key]], axis=0)
             self.nn.outputs = output_tensors
+        return
 
+    def prepare_train(self, tfconfig, tf_loss_func, **tf_loss_func_options):
+        ''' パラメータを与えて損失関数定義などの学習準備を行う
+        tfconfig: TFConfigオブジェクト
+        tf_loss_func: TensorFlowの損失関数
+        **tf_loss_func_options: tf_loss_funcに与えるオプション '''
         # 損失関数の定義
         import tensorflow.summary as summary
 
@@ -66,7 +70,7 @@ class SingleNetworkModel(Model):
         towers = tfconfig.towers
         if ntowers == 1:
             self.loss = tf_loss_func(**tf_loss_func_options)
-            self.train_op = self.optimizer.minimize(self.loss, global_step = self.global_step_tensor)
+            self.train_op = self.optimizer.minimize(self.loss, global_step = self.global_step_tensor())
         else:
             tower_grads = []
             tower_losses = None

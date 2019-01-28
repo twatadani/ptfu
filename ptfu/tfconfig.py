@@ -142,16 +142,16 @@ class TFConfig:
                 else:
                     prefix = gpuprefix
             
-            ngpu_per_tower = len(self.gpu_list)
+                ngpu_per_tower = len(self.gpu_list)
                 
-            tw_start = i * ngpu_per_tower
-            tw_end = tw_start + ngpu_per_tower - 1
-            if i == self.ntowers() - 1:
-                tw_end = len(self.gpu_list) - 1
+                tw_start = i * ngpu_per_tower
+                tw_end = tw_start + ngpu_per_tower - 1
+                if i == self.ntowers() - 1:
+                    tw_end = len(self.gpu_list) - 1
 
-            tower = []
-            for gpunum in self.gpu_list[tw_start:tw_end]:
-                tower.append(prefix + str(gpunum))
+                tower = []
+                for gpunum in self.gpu_list[tw_start:tw_end]:
+                    tower.append(prefix + str(gpunum))
             towers.append(tower)
         return towers
         
