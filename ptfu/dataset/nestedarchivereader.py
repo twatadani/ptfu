@@ -25,23 +25,9 @@ class NestedArchiveReader(ArchiveReader):
         innerstoretype: ネストの内側のアーカイブのStoreType
         innername: ネストの内側に格納されているアーカイブ名
         '''
-        #self.outerreader = outerstoretype.reader(outersrcpath, use_cache)
-        #self.outerfp = self.outerreader.__class__._open_src(outersrcpath)
-        #inner_view = self.outerreader.rawmemberview(outersrcpath, innername)
         self.inner_view = InnerView(outerstoretype, outersrcpath, innerstoretype, innername, use_cache)
-        #self.innerreader = innerstoretype.reader(inner_view, use_cache)
         super(NestedArchiveReader, self).__init__(innerstoretype, self.inner_view, use_cache)
-        #self.outerstoretype = outerstoretype
-        #self.outersrcpath = outersrcpath
-        #self.innerstoretype = innerstoretype
-        #self.innername = innername
         return
-
-    #def __del__(self):
-        #if hasattr(self, 'outerfp') and hasattr(self, 'outerreader'):
-            #if self.outerfp is not None and self.outerreader is not None:
-                #self.outerreader.__class__._close_src(self.outerfp)
-        #return
 
     def namelist(self, datatype, allow_cached=True):
         ''' 格納されているアーカイブメンバのうち、datatypeにマッチするものの名前のコレクションを返す
@@ -49,7 +35,6 @@ class NestedArchiveReader(ArchiveReader):
         if self.namelist_cache is not None and allow_cached:
             return self.namelist_cache
         else:
-            #print('namelistのためにNestedArchiveReaderの_open_srcを呼び出します')
             fp = self.__class__._open_src(self.inner_view)
             innerreader = fp[1][0]
             self.namelist_cache = innerreader.namelist(datatype, allow_cached)
@@ -65,13 +50,10 @@ class NestedArchiveReader(ArchiveReader):
         if not isinstance(srcpath, InnerView):
             raise ValueError('srcpath should be an instance of InnerView', srcpath)
         outerreader = srcpath.outerstoretype.reader(srcpath.outersrcpath, srcpath.use_cache)
-        #print('open outer')
         fp0 = outerreader._open_src(outerreader.srcpath)
         view_of_inner = outerreader.__class__.rawmemberview(fp0, srcpath.innername)
         innerreader = srcpath.innerstoretype.reader(view_of_inner, srcpath.use_cache)
-        #print('open inner')
         fp1 = innerreader._open_src(innerreader.srcpath)
-        #print('open end')
         return ((outerreader, fp0), (innerreader, fp1))
 
 

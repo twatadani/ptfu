@@ -77,10 +77,6 @@ class TensorValueEndFlag(EndFlag):
         return
 
     def update_lastvalues(self):
-        #last_fetches = self.smartsession.get_last_fetches_dict()
-        #if last_fetches is None:
-            #return
-        #elif isinstance(last_fetches, list) or isinstance(last_fetches, tuple):
         if self.smartsession.last_tensorvaluedict_endflag is not None:
             lastvalue = self.smartsession.last_tensorvaluedict_endflag[self.tensor]
             self.lastvalues.append(lastvalue)

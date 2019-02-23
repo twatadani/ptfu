@@ -13,16 +13,6 @@ class ZipReader(ArchiveReader):
         super(ZipReader, self).__init__(StoreType.ZIP, srcpath, use_diskcache)
         return
 
-    #@staticmethod
-    #def rawmemberview(fp, membername):
-        #''' membernameを与えてこのアーカイブ内のmemberに対するビューを取得する
-        #fpは_open_srcで得られるもの。ZipReaderの場合ZipFileオブジェクト。
-        #ビューはBufferedReader, File-like objectなど。read, seekができるオブジェクトを返す '''
-        #from io import BufferedReader
-        #rawview = fp.open(membername, mode='r')
-        #return BufferedReader(rawview)
-
-
     @staticmethod
     def _open_src(srcpath):
         ''' アーカイブをオープンし、fpを返す '''
@@ -46,28 +36,3 @@ class ZipReader(ArchiveReader):
         bytesio = BytesIO(data)
         return bytesio
 
-
-    #def open_src(self):
-        #''' アーカイブソースをオープンする ZipReaderではZipFileをオープンする '''
-        #if self.zfp is None:
-            #self.zfp = ZipFile(self.srcpath, mode='r')
-        #return self.zfp
-
-    #def close_src(self):
-        #''' アーカイブソースをクローズする ZipReaderではZipFileをクローズする '''
-        #if self.zfp is not None:
-            #self.zfp.close()
-            #self.zfp = None
-        #return
-
-    #def storetype(self):
-        #''' このArchiveReaderに対応するStoreTypeを返す '''
-        #from .datatype import StoreType
-        #return StoreType.ZIP
-
-    #def alllist(self):
-        #''' このアーカイブ内のすべての要素を返す '''
-        #if self.zfp is None:
-            #self.open_src()
-        #namelist = self.zfp.namelist()
-        #return namelist

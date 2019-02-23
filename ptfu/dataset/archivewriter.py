@@ -64,59 +64,13 @@ class ArchiveWriter:
         ''' queueを与えて複数のデータを書き込む
         queueからpopされるデータは(name, ndarray)のタプル '''
         try:
-            #print('ArchiveWriter writebyqが呼び出されました。')
-            #print('queue: 全件数は' + str(queue.datanumber()))
-            #self._open_dst()
-        
-            #print('writebyq _open_dstが終了しました。')
             with self:
                 while queue.hasnext():
-                    #print('whileループに入りました。')
                     data = queue.pop()
-                    #print('popが終了しました。poppednumber=' + str(queue.poppednumber()))
                     if data is not None:
                         self._write_func(data[0], data[1])
-                    #print('_write_funcが終了しました。')
-                #print('writebyq whileループが終了しました。')
-                #self._close_dst()
-                #print('ArchiveWriter writebyqを終了します。')
                 return
         except:
             import traceback
             traceback.print_exc()
 
-    #def __init__(self, dstpath, **options):
-        #''' ArchiveWriterのイニシャライザ
-        #dstpath: 書き込みを行うディレクトリまたはアーカイブのパス
-        #options: オプション 具象クラスで自由に規定する '''
-        #self.dstpath = dstpath # 書き込みを行うディレクトリまたはアーカイブのパス
-        #self.writestarted = False
-        #self.options = options
-        #return
-
-    #def __del__(self):
-        #''' StoreTypeWriterのデストラクタ
-        #デフォルト動作ではclose_dstのみを行う '''
-        #self.close_dst()
-
-    #def open_dst(self):
-        #''' アーカイブのオープン デフォルトではなにもしない 
-        #具象クラスで必要ならばオーバーライドする '''
-        #return
-
-    #def close_dst(self):
-        #''' アーカイブのクローズ デフォルトではなにもしない
-        #具象クラスで必要ならばオーバーライドする '''
-        #return
-
-    #def appendNext(self, name, ndarray):
-        #''' iteratorから得た1件のデータを書き込む '''
-        #if self.writestarted == False:
-            #self.open_dst()
-            #self.writestarted = True
-        #self._appendNext(name, ndarray)
-        #return
-
-    #def _appendNext(self, name, ndarray):
-        #''' iteratorから得た1件のデータを書き込む。具象クラスで定義する '''
-        #raise NotImplementedError

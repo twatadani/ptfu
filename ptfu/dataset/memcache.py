@@ -19,18 +19,7 @@ class MemCache:
 
     def __del__(self):
         ''' キャッシュをクリーンする '''
-        #logger = get_default_logger()
-        #start_msg = 'メモリキャッシュをクリーンアップしています。'
-        #end_msg = 'メモリキャッシュのクリーンアップが終了しました。'
-        #if logger is not None:
-            #logger.log(start_msg)
-        #else:
-            #print(start_msg)
         self.cachedict = {}
-        #if logger is not None:
-            #logger.log(end_msg)
-        #else:
-            #print(end_msg)
         return
 
     def namelist(self):

@@ -17,10 +17,6 @@ class DataType(Enum):
         ''' 拡張子の文字列を返す '''
         return self.name.lower()
 
-    #def reader(self):
-        #''' このDataTypeに対応したTypeReaderの具象インスタンスを返す'''
-        #return self.readerclass.reader
-
 # DICOMは例外なのでgetextを定義しなおす
 DataType.DICOM.getext = (lambda : 'dcm')
 
@@ -31,8 +27,8 @@ from .dicomreader import DICOMReader
 from .npyreader import NPYReader
 from .cifar10datareader import Cifar10DataReader
 
-DataType.PNG.reader = PNGReader#.reader
-DataType.JPG.reader = JPGReader#.reader
-DataType.DICOM.reader = DICOMReader#.reader
-DataType.NPY.reader = NPYReader#.reader
+DataType.PNG.reader = PNGReader
+DataType.JPG.reader = JPGReader
+DataType.DICOM.reader = DICOMReader
+DataType.NPY.reader = NPYReader
 DataType.CIFAR10.reader = Cifar10DataReader

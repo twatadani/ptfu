@@ -25,16 +25,6 @@ class DirReader(ArchiveReader):
         result.extend(result_small)
         return set(result)
 
-    #@staticmethod
-    #def rawmemberview(fp, membername):
-        #''' membernameを与えてこのアーカイブ内のmemberに対するビューを取得する
-        #ビューはBufferedReader, File-like objectなど。read, seekができるオブジェクトを返す '''
-        #import os.path
-        #from io import FileIO, BufferedReader
-        #fullname = os.path.join(fp, membername)
-        #fileio = FileIO(fullname, mode='r')
-        #return BufferedReader(fileio)
-
     @staticmethod
     def _find_name(fp, name):
         ''' fp内からnameに該当するデータがあるかどうかを探す 
@@ -61,15 +51,3 @@ class DirReader(ArchiveReader):
         ''' fpで与えられたアーカイブをクローズする
         DirReaderではダミー '''
         return
-
-    #def storetype(self):
-        #''' このArchiveReaderに対応するStoreTypeを返す '''
-        #from .datatype import StoreType
-        #return StoreType.DIR
-
-    #def alllist(self):
-        #''' このアーカイブ内のすべての要素を返す '''
-        #globstr = os.path.join(self.srcpath, '**/*')
-        #globresult = glob.iglob(globstr, recursive=True)
-        #for i in globresult:
-            #yield os.path.relpath(i, start=self.srcpath)

@@ -42,7 +42,6 @@ class SmartSession:
                                  synchronous = True,
                                  hook_name='save_checkpoint'))
 
-        #if len(initial_hooks) > 0:
         self.registerHooks(initial_hooks)
 
         self.last_fetches = None
@@ -108,7 +107,6 @@ class SmartSession:
         ''' with構文終了時の処理 '''
         if self.session is not None:
             self.session.close()
-            #self.session.__exit__(exc_type, exc_value, traceback)
 
         if exc_type is None: #例外なしで終了したとき
             return
@@ -134,7 +132,6 @@ class SmartSession:
         if isinstance(fetches, list) or isinstance(fetches, tuple): #リストorタプルの場合
             finalfetches |= set(fetches)
             is_fetch_list = True
-            #finalfetches.extend(fetches)
         else: # それ以外の場合
             finalfetches.add(fetches)
             is_fetch_list = False
@@ -167,8 +164,6 @@ class SmartSession:
 
         # 最新のglobal stepを保存
         self.last_global_step = self.last_tensorvaluedict[self.gstep_tensor]
-        #gstep_idx = len(result) - len(self.fetches_extended)
-        #self.last_global_step = result[gstep_idx]
 
         # 最新のsummaryを保存
         if self.tfconfig.use_summary:
@@ -177,15 +172,6 @@ class SmartSession:
             else:
                 self.last_summary = None
             
-            #sum_idx = gstep_idx + 1
-            # summaryに保存するものがなにもない場合の対策
-            #if len(result) >= sum_idx+1:
-                #self.last_summary = result[sum_idx]
-            #else:
-                #self.last_summary = None
-
-
-
         # endflag用
         self.last_tensorvaluedict_endflag = {}
         for tensor in self.endflag_tensor_set:
@@ -197,10 +183,8 @@ class SmartSession:
             self.last_fetches = []
             for tensor in fetches:
                 self.last_fetches.append(result[reversedict[tensor]])
-                #self.last_tensorvaluedict_user[tensor] = result[reversedict[tensor]]
         else:
             self.last_fetches = result[reversedict[fetches]]
-            #self.last_tensorvaluedict_user[fetch] = result[reversedict[fetch]]
         
         # stepに応じて登録されたhookを実行
         if run_hooks:

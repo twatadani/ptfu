@@ -7,14 +7,10 @@ class SingleNetworkModel(Model):
     
     def __init__(self, neural_network, optimizer):
         from ..nn.neuralnet import NeuralNet
-        #import tensorflow.summary as summary
 
         super(SingleNetworkModel, self).__init__()
         assert isinstance(neural_network, NeuralNet) # 型チェック
         self.nn = neural_network
-        #self.loss = lossfunc
-        #if self.loss is not None:
-        #    summary.scalar(name = 'Loss', tensor = self.loss)
         self.optimizer = optimizer
         self.training = None # マルチプロセスモデルに従い、trainingはmultiprocessing.Queueに変更。
         self.prepared = False # 学習準備ができたかどうか
@@ -144,20 +140,6 @@ class SingleNetworkModel(Model):
         minibatchsize = self.minibatchsize
         if not is_tfrecord: # TFRecordではキューイングは行わない
             dataset.start_random_minibatch_queue(minibatchsize)
-            #from concurrent.futures import ProcessPoolExecutor
-            #from .. import functions as f
-            #qparallel = options['qparallel'] if 'qparallel' in options else 3
-
-            #qmax = 200
-            #self.trainq = manager.Queue(qmax)
-            #self.qthreashold = 100
-            #self.qbatchsize = (qmax - self.qthreashold) // qparallel
-            #ncpu = f.cpu_count()
-            #executor = ProcessPoolExecutor(ncpu)
-            #datasetinfo = dataset.toDataSetInfo()
-            #for i in range(qparallel):
-                #executor.submit(self._qloop, datasetinfo, self.trainq, self.qthreashold,
-                                #self.qbatchsize, minibatchsize, self.training)
         
         # Tensorflowのコンフィグ
         if 'tfconfig' in options:
@@ -169,26 +151,6 @@ class SingleNetworkModel(Model):
         logger.log(self.nn.print_network())
 
         import tensorflow as tf
-        #with tf.Session(config = tfconfig.create_configproto()) as session:
-            # TFRecordの場合、データセットソースを設定する
-            #if is_tfrecord:
-                #print(dataset.srclist)
-                #srcfd = { dataset.srclist_ph: dataset.srclist }
-                #print(dataset.train_iterator_initializer())
-                #print(dataset.train_iterator)
-                #session.run(dataset.train_iterator_initializer(), feed_dict=srcfd)
-            #session.run(tf.global_variables_initializer())
-
-            #minibatch = session.run(dataset.minibatch_op)
-            #print('b')
-            #print(minibatch.shape)
-
-            #print('a')
-             #for i in range(10):
-                #print(i)
-                #session.run(self.train_op)
-
-        #assert False
 
         if is_tfrecord:
             init_ops = [dataset.train_iterator_initializer(),
@@ -203,44 +165,19 @@ class SingleNetworkModel(Model):
                           session_initialization_ops = init_ops,
                           initialization_feed_dict = init_fd) as session:
             
-            #print('session alpha')
-            # training tensorをTrueに設定する
-            #session.run(self.set_training_true_op) #毎回fdで指定するからいらない
-
-            #print('session beta')
             # ループ中のhookを設定
             if 'hooks' in options:
                 session.registerHooks(options['hooks'])
 
-            #print('session gamma')
             # ループ終了条件の設定
             endflag.setSmartSession(session)
-            
-            # TFRecordの場合、データセットソースを設定する
-                #print(dataset.train_iterator_initializer())
-                #print(dataset.train_iterator)
-                #try:
-                    #print('session delta')
-                    #session.run([ dataset.train_iterator_initializer(),
-                    #self.set_training_true_op ],
-                    #feed_dict=srcfd)
-                #except:
-                    #import traceback
-                    #traceback.print_exc()
-                #print('session epsilon')
-                
-                #print('a')
-                #assert False
-            #print('session delta')
+
             while not endflag.should_end():
                 if is_tfrecord:
                     session.run(self.train_op)
                 else:
-                    #minibatch = self._minibatch_fromq()
                     minibatch = dataset.obtain_random_minibatch(minibatchsize)
                     fd = self._create_fd(minibatch, fdmapper, True)
-                    #print('fd:', fd)
-                    #assert False
                     session.run(self.train_op, feed_dict=fd)
 
             # 終了条件を表示
@@ -249,15 +186,6 @@ class SingleNetworkModel(Model):
         self.training.put(True)
         return
 
-    #def _minibatch_fromq(self):
-        #''' キューからミニバッチデータを取り出す '''
-        #import random
-        #from time import sleep
-        #while self.trainq.empty():
-            #sleep(random.random())
-        #else:
-            #return self.trainq.get()
-            
     def _create_fd(self, minibatch, fdmapper, training):
         ''' ミニバッチデータからfeed_dictを作成する '''
         fd = {}
@@ -267,32 +195,6 @@ class SingleNetworkModel(Model):
         if training_tensor is not None:
             fd[training_tensor] = training
         return fd
-
-    #@staticmethod
-    #def _qloop(datasetinfo, queue, qthreashold, qbatchsize, minibatchsize, signalqueue):
-        #''' ミニバッチキューをバックグラウンドで作成するワーカー関数
-        #processベースの並列処理のため、static methodで実装する '''
-        #from time import sleep
-        #import random
-
-        #try:
-            #dataset = datasetinfo.constructDataSet()
-            #while signalqueue.empty():
-                #if queue.qsize() < qthreashold:
-                    #for _ in range(qbatchsize):
-                        #minibatch = dataset.obtain_minibatch(minibatchsize)
-                        #if minibatch is not None:
-                            #queue.put(minibatch)
-                        #if not signalqueue.empty():
-                            #continue
-                #else:
-                    #sleep(random.random())
-        #except:
-            #import traceback
-            #from ..logger import get_default_logger
-            #logger = get_default_logger()
-            #logger.error(traceback.format_exc())
-        #return
 
     def validate(self, dataset, minibatchsize, tfconfig, fdmapper, checkpoint_dir, 
                 validationhook=None):
@@ -335,7 +237,6 @@ class SingleNetworkModel(Model):
         
         if is_tfrecord:
             init_ops = [dataset.validation_iterator_initializer(),
-                        #dataset.train_iterator_initializer(),
                         self.set_training_false_op ]
             init_fd = { dataset.srclist_ph: list(dataset.srclist) }
         else:
@@ -343,8 +244,7 @@ class SingleNetworkModel(Model):
             init_fd = None
 
         with SmartSession(tfconfig) as session:
-                        #session_initialization_ops = init_ops,
-                        #initialization_feed_dict = init_fd) as session:
+
             # 評価対象となるtensor
             if single_hook:
                 evaluating_tensors = validationhook.tensorlist
@@ -380,41 +280,6 @@ class SingleNetworkModel(Model):
                     fd = self._create_fd(minibatch, fdmapper, False)
                     results = session.run(evaluating_tensors, feed_dict=fd, run_hooks=True)
         return
-
-
-    #def forward_wholedataset(self, dataset, tfconfig, fdmapper,
-                             #session=None, checkpoint_dir=None):
-        #''' 学習後のモデルに対して検証用データセットのすべてを与え、forward propagationを行う。
-        #学習後モデルはsessionが与えられた場合はそのsessionが、checkpoint_dirが与えられた場合は
-        #checkpoint_dirの最新checkpointが用いられる。
-        #すでにsessionがある場合は引数のtfconfigは使用されない。
-        #fdmapperはtrainと同じ形式。
-        #返り値はこのモデルが保有するneural networkのoutput_tensorsがkey、
-        #それらに対する値のリストがvalueとなった辞書形式'''
-        #import tensorflow as tf
-        #from ptfu import SmartSession
-
-        #output_tensors = self.nn.get_output_tensors()
-
-        #wholebatch = dataset.obtain_wholedata()
-        #fd = self._create_fd(wholebatch, fdmapper, False)
-
-        #if session is None:
-            #last_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
-            #if last_checkpoint is not None:
-                #with SmartSession(tfconfig) as session:
-                    #saver = tf.train.Saver()
-                    #saver.restore(session.session, save_path=last_checkpoint)
-                    # TrainingをFalseに設定
-                    #session.run(self.set_training_false_op)
-                    #result = session.run(output_tensors, feed_dict=fd)                    
-            #else:
-                #raise ValueError('latest checkpoint cannot be found. search dir=' + checkpoint_dir)
-        #else:
-            #result = session.run(output_tensors, feed_dict=fd)
-
-
-        #return result
 
 
     @staticmethod

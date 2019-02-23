@@ -9,6 +9,3 @@ class PNGReader(PILReader):
         from .datatype import DataType
         super(PNGReader, self).__init__(DataType.PNG)
         return
-
-    # singleton-like instance
-    #reader = PNGReader()

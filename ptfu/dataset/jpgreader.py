@@ -8,6 +8,3 @@ class JPGReader(PILReader):
         from .datatype import DataType
         super(JPGReader, self).__init__(DataType.JPG)
         return
-
-    # singleton-like instance
-    #reader = JPGReader()

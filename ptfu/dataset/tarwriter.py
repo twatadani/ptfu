@@ -39,30 +39,3 @@ class TarWriter(ArchiveWriter):
         self.fp.addfile(info, fileobj=bytesio)
         bytesio.close()
         return
-
-
-    #def open_dst(self):
-        #''' アーカイブのオープン TarWriterではTarFileのオープンを行う '''
-        #if self.tfp is None:
-            #parent_dir = os.path.dirname(self.dstpath)
-            #if not os.path.exists(parent_dir):
-                #os.makedirs(parent_dir)
-            #self.tfp = TarFile.open(name=self.dstpath, mode='w:gz')
-        #return
-
-    #def close_dst(self):
-        #''' アーカイブのクローズ TarWriterではTarFileのクローズを行う '''
-        #if self.tfp is not None:
-            #self.tfp.close()
-            #self.tfp = None
-
-    #def _appendNext(self, name, ndarray):
-        #''' iteratorから得た1件のデータを書き込む '''
-        #buf = BytesIO()
-        #np.save(buf, ndarray, allow_pickle=False)
-        #info = TarInfo(name=name + '.npy')
-        #info.size = len(buf.getbuffer())
-        #buf.seek(0)
-        #self.tfp.addfile(info, fileobj=buf)
-        #buf.close()
-        #return

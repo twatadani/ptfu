@@ -24,17 +24,8 @@ class CacheReader(ArchiveReader):
 
     def hitnames(self, collection_of_name, datatype):
         ''' 現在のキャッシュ内にcollection_of_nameにヒットするもののコレクションを返す '''
-        #print('hitnames enter')
         names = set(self.namelist(datatype, False))
-        #print('names got')
-        #print('キャッシュのnamelistは', len(names), '件あります。')
-        #print('サーチするcollection_of_nameは', len(collection_of_name), '件あります。')
-        #print('sample of collection_of_name', list(collection_of_name)[0])
         hitnames = set(collection_of_name) & names
-        #print('type of hitnames=', type(hitnames))
-        #print('len of hitnames', len(hitnames))
-        #print('hitnames:', hitnames)
-        #print('hitnames got')
         return hitnames
 
     def getbylist(self, list_of_name, datatype, max_workers=None):
@@ -44,7 +35,6 @@ class CacheReader(ArchiveReader):
         result = list(m)
         result = [ x for x in result if x[1] is not None ]
         return result
-
 
     @staticmethod
     def _find_name(fp, name):

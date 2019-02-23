@@ -49,6 +49,3 @@ class DICOMReader(TypeReader):
             nparray = -nparray
 
         return nparray
-
-    # singleton-like instance
-    #reader = DICOMReader()

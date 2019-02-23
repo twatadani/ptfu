@@ -40,22 +40,9 @@ class NeuralNet:
     def _prepare_training_tensor(self):
         ''' 学習用か検証用かを設定するboolean tensorを設定する '''
         from ..kernel import kernel
-        #self.training_tensor = tf.placeholder(dtype=tf.bool,
-        #                                      shape=(),
-        #                                      name='training')
-
-        # TFRecord trainingでplaceholder不使用に対応するためVariableとする
-        #self.training_tensor = tf.Variable(True,
-                                           #dtype=tf.bool,
-                                           #shape=(),
-                                           #trainable=False,
-                                           #name='training')
         self.training_tensor = kernel.get_training_tensor()
         self.inputs['training'] = self.training_tensor
         return
-
-    #def get_training_tensor(self):
-        #return self.training_tensor
 
     def get_input_tensors(self):
         ''' このNeuralNetの入力tensorのリストを得る '''

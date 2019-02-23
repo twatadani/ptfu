@@ -28,11 +28,6 @@ class Kernel:
         ''' 学習中か否かを表すtraining tensorを返す '''
         return self.training_tensor
 
-    #def manager(self):
-        #if self.
-        #if __name__ == '__main__':
-
-
     def logger(self):
         from .logger import get_default_logger
         return get_default_logger()

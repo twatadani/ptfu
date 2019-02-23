@@ -17,7 +17,6 @@ class ZipWriter(ArchiveWriter):
         from .storetype import StoreType
         super(ZipWriter, self).__init__(StoreType.ZIP, dstpath)
         return
-        #self.zfp = None # ZipFile object
 
     def _open_dst(self):
         ''' アーカイブファイルをオープンし、self.fpを設定する。 '''
@@ -35,26 +34,3 @@ class ZipWriter(ArchiveWriter):
         self.fp.writestr(name + '.npy', bytesio.getbuffer())
         bytesio.close()
         return
-
-    #def open_dst(self):
-        #''' アーカイブのオープン ZipWriterではzipアーカイブのオープンを行う '''
-        #if self.zfp is None:
-            #parent_dir = os.path.dirname(self.dstpath)
-            #if not os.path.exists(parent_dir):
-                #os.makedirs(parent_dir)
-            #self.zfp = ZipFile(self.dstpath, mode='w')
-        #return
-
-    #def close_dst(self):
-        #''' アーカイブのクローズ ZipWriterではzipアーカイブのクローズを行う '''
-        #if self.zfp is not None:
-            #self.zfp.close()
-            #self.zfp = None
-
-    #def _appendNext(self, name, ndarray):
-        #''' iteratorから得た1件のデータを書き込む '''
-        #buf = BytesIO()
-        #np.save(buf, ndarray, allow_pickle=False)
-        #self.zfp.writestr(name + '.npy', buf.getbuffer())
-        #buf.close()
-        #return

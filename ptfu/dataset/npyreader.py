@@ -2,7 +2,6 @@
 
 from .typereader import TypeReader
 
-import os.path
 import numpy as np
 
 class NPYReader(TypeReader):
@@ -15,19 +14,3 @@ class NPYReader(TypeReader):
         ''' ファイルパスまたはBytesIOオブジェクトから読み込む '''
         return np.load(path)
 
-    #def read_from_rawfile(self, srcpath, filename, arcobj):
-        #''' 生のディレクトリ内からデータを読み出し、ndarray形式で返す。
-        #srcpath: ソースディレクトリのパス
-        #filename: ファイル名
-        #srcpath, filenameはos.path.joinで結合するので、srcpathにファイル名まで記述して、filenameが空でも
-       # よい。zip, tarとの引数の数をそろえるため2引数としている。 
-        #arcobj: この関数では使用しない '''
-        #fullpath = os.path.join(srcpath, filename)
-        #return np.load(fullpath)
-
-    #def read_from_bytes(self, bytesio):
-        #''' インメモリに読み込まれたBytesIOオブジェクトからデータを読み出し、ndarray形式で返す。 '''
-        #return np.load(bytesio)
-
-    # singleton-like instance
-    #reader = NPYReader()

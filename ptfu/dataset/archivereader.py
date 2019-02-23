@@ -152,20 +152,15 @@ class ArchiveReader:
             return queue
         
         # キャッシュを使う場合、まずキャッシュを探索する
-        #print('self.use_cache:', self.use_cache)
         if self.use_cache == True:
-            #print('use_cacheの設定により、キャッシュを探索します。')
 
             # メモリキャッシュの探索
             try:
                 hitnames = self.mcreader.hitnames(collection_of_name, datatype)
                 if len(hitnames) > 0:
-                    #print('cache hit!')
                     cacheset = self.mcreader.getbylist(collection_of_name, datatype)
                 else:
-                    #print('cache miss')
                     cacheset = {}
-                #print('cacheset:', cacheset)
             except:
                 import traceback
                 traceback.print_exc()
@@ -204,10 +199,7 @@ class ArchiveReader:
 
             # ディスクキャッシュでは読み込みに失敗することがあるので、実際に読めた件数をチェックする
             nactual_read = len(cacheset)
-            #print('ディスクキャッシュで実際に読み込み成功したのは', nactual_read, '件でした。')
             dreadset = { x[0] for x in cacheset }
-
-            
 
             # 未取得データの差分を作成する
             collection_of_name = set(collection_of_name) - set(dreadset)
@@ -223,16 +215,12 @@ class ArchiveReader:
             ncpu = max(f.cpu_count() // 2, 1)
         ndata = len(collection_of_name)
         if ndata >= ncpu * 10: # CPU数の10倍以上のデータがあればスレッドを分ける
-            #print('ndataが' + str(ndata) + '件のため、マルチプロセスでの読み込みを行います。')
             futures = []
             splitted = f.splitlist(list(collection_of_name), ncpu)
-            #print('分割数: ' + str(len(splitted)))
             sum = 0
             for plist in splitted:
                 sum += len(plist)
-            #print('総数: ', sum)
             for partial_list in splitted:
-                #print('読み込みワーカーをsubmitします。')
                 futures.append(executor.submit(self.__class__._getlistq_worker,
                                                 self.__class__._find_name,
                                                 self.__class__._open_src,
@@ -243,14 +231,6 @@ class ArchiveReader:
                                                 queue,
                                                 cacheq))
         else: # 少ない場合は1つだけ
-            #print('ndataが' + str(ndata) + '件と少ないため、スレッドベースでの読み込みを行います。')
-            #self.__class__._getlistq_worker(self.__class__._find_name,
-                                            #self.__class__._open_src,
-                                            #self.__class__._close_src,
-                                            #self.srcpath, collection_of_name,
-                                            #datatype, queue, cacheq)
-            
-
             texecutor = kernel.texecutor
             future = texecutor.submit(self.__class__._getlistq_worker,
                                     self.__class__._find_name,
@@ -262,9 +242,7 @@ class ArchiveReader:
                                     queue,
                                     cacheq)
         if self.use_cache == True:
-            
             self.mcwriter.writebyq(cacheq)
-            #print('d')
         return queue
 
         
@@ -272,41 +250,25 @@ class ArchiveReader:
     def _getlistq_worker(findname_func, open_func, close_func, srcpath, partial_list, datatype, queue, cacheq):
         ''' マルチスレッド・マルチプロセス用ワーカー関数。partial_listで与えられた名前を持つメンバをqueueに読み出す '''
         from .memcache import MemCache
-        #print('ArchiveReaderの_getlistq_workerが呼び出されました。')
-        #print('_getlistq_workerがopen_funcを呼び出します。')
         fp = open_func(srcpath)
         for name in partial_list:
             try:
                 if isinstance(fp, MemCache):
-                    #print('a')
-                    data = fp.read(name)#, datatype)
-                    #print('b')
+                    data = fp.read(name)
                 else:
-                    #print('findname_funcを起動します')
                     path = findname_func(fp, name)
-                    #print('pathが見つかりました path=', path)
-                    #print('findname_funcが見つけたpath: ' + str(path))
-                    #print('datatypeは' + str(datatype))
-                    #print('readerは' + str(datatype.reader))
                     data = datatype.reader().read(path)
-                    #print('dataをloadしました。')
-                    #print('読み込んだdataのshape: ' + str(data.shape))
                 if data is not None:
-                    #print('キューにデータを入力します。')
                     tup = (name, data)
                     queue.push(tup)
-                    #print('キューにデータを入力しました。')
                     # キャッシュを使用する設定の場合、キャッシュ用のキューにも書き込む
                     if cacheq is not None:
-                        #print('キャッシュキューにデータを入力します。')
                         cacheq.push(tup)
                     if path is not None and isinstance(path, BytesIO):
                         path.close()
                 else:
-                    #print('データが見つからなかったのでキューの予定数を減少させます。')
                     queue.esizelock.acquire()
                     queue.expected_size.value -= 1
-                    #print('減少させました。value=', queue.expected_size.value)
                     queue.esizelock.release()
             except OSError as e:
                 import ptfu
@@ -315,9 +277,7 @@ class ArchiveReader:
             except:
                 import traceback
                 traceback.print_exc()
-        #print('_getlistq_workerがclose_funcを呼び出します')
         close_func(fp)
-        #print('_getlistq_workerを終了します')
         return
 
     @staticmethod
@@ -325,68 +285,4 @@ class ArchiveReader:
         ''' fpで与えられたアーカイブをクローズする '''
         fp.close()
         return
-
-
-
-    #def __del__(self):
-        #''' デストラクタ '''
-        #self.close_src()
-
-    #def open_src(self):
-        #''' アーカイブソースをオープンする デフォルトではなにもしない '''
-        #return None
-
-    #def close_src(self):
-        #''' アーカイブソースをクローズする デフォルトではなにもしない '''
-
-    #def iterator(self):
-        #''' 個々のデータを読み出してゆくイテレータを返す
-        #返り値は(データの名前, ndarray)のタプル
-        #'''
-        #arcobj = self.open_src()
-        #arclist = self.arclist()
-        #for i in arclist:
-            #storetype = self.storetype()
-            #arcname = self.arcname()
-            #yield (os.path.splitext(os.path.basename(i))[0], self.typereader.readtonpy(storetype, arcname, i, arcobj))
-        #self.close_src()
-
-    #def storetype(self):
-        #''' このArchiveReaderに対応するStoreTypeを返す 具象クラスで定義する '''
-        #raise NotImplementedError
-
-    #def arcname(self):
-        #''' このArchiveReaderのアーカイブ名を返す デフォルトはself.srcpathをそのまま返す'''
-        #return self.srcpath
-        
-
-
-    #def arclist(self):
-        #''' 格納されているアーカイブメンバのうち、datatypeにマッチするもののイテレータを返す '''
-        #ext = '.' + self.datatype.getext()
-        #upperext = ext.upper()
-        #namelist = self.alllist()
-        #smalliter = self._iterext(ext, namelist)
-        #largeiter = self._iterext(upperext, namelist)
-        #mergeiter = itertools.chain(smalliter, largeiter)
-        #return mergeiter
-
-
-        
-    #@staticmethod
-    #def _iterext(ext, namelist):
-        #''' namelist内にextを含む集合を返すイテレータを生成するジェネレータ関数 '''
-        #for i in namelist:
-            #if ext in i:
-                #yield i
-
-    #def alllist(self):
-        #''' 格納されているメンバすべてを返す内部処理用の関数 実際には具象クラスで定義する
-        #返すのはリストでもイテレータでもよい。
-        #arclistがオーバーライドされていればalllistは定義しなくともよい '''
-        #raise NotImplementedError
-
-    #def get_bytesio_byname(self, name):
-        #''' 名前を指定してアーカイブメンバを読み出す '''
-        #raise NotImplementedError
 

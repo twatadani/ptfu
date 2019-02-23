@@ -27,28 +27,13 @@ class StoreType(Enum):
         if ext == '':
             return None
         else:
-            #extdict = {}
             for storetype in cls:
-                #print(storetype)
                 cext = storetype.getext()
                 if cext != '':
-                    #extdict[cext] = storetype
                     if src.endswith(cext):
                         return storetype
             return None
             
-    #def reader(self):
-        #''' このStoreTypeに対応するArchiveReaderのクラスオブジェクトを返す '''
-        #raise NotImplementedError
-
-    #def readerfunc(self, typereader):
-        #''' このStoreTypeではtypereaderがどのreadメソッドを使えば良いかを返す '''
-        #raise NotImplementedError
-
-    #def writer(self):
-        #''' このStoreTypeに対応するArchiveWriterのクラスオブジェクトを返す '''
-        #raise NotImplementedError
-
 # DIRは拡張子を持たないので、空文字列を返す
 # 基本的にgetextは書き込み用
 StoreType.DIR.getext = (lambda: '')
@@ -71,22 +56,11 @@ StoreType.MEMCACHE.reader = CacheReader
 StoreType.NESTED.reader = NestedArchiveReader
 StoreType.CIFAR10BATCH.reader = Cifar10BatchReader
 
-# readerfuncの実体をそれぞれのenumメンバに与える
-#StoreType.DIR.readerfunc = (lambda typereader: typereader.read_from_rawfile)
-#StoreType.TAR.readerfunc = (lambda typereader: typereader.read_from_tar)
-#StoreType.ZIP.readerfunc = (lambda typereader: typereader.read_from_zip)
-
 # writerの実体をenumメンバに与える
 from .dirwriter import DirWriter
 from .zipwriter import ZipWriter
 from .tarwriter import TarWriter
 from .tfrecordwriter import TFRecordWriter
-
-#from .dstwriter import DirWriter, ZipWriter, TarWriter, TFRecordWriter
-#StoreType.DIR.writer = (lambda: DirWriter)
-#StoreType.TAR.writer = (lambda: TarWriter)
-#StoreType.ZIP.writer = (lambda: ZipWriter)
-#StoreType.TFRECORD.writer = (lambda: TFRecordWriter)
 
 StoreType.DIR.writer = DirWriter
 StoreType.TAR.writer = TarWriter

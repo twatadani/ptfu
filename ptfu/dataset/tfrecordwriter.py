@@ -30,18 +30,8 @@ class TFRecordWriter(ArchiveWriter):
         self.writer = None # TFRecordWriter object
         return
 
-    #def __enter__(self):
-        #''' archivewriterをオーバーライド '''
-        #return
-
     def __exit__(self, exc_type, exc_value, traceback):
-        #print('a')
-        #self.writer.flush()
-        #print('b')
-        #self.writer.close()
-        #print('c')
         self.writer.__exit__(exc_type, exc_value, traceback)
-        #print('d')
         return
 
     def _open_dst(self):
@@ -70,35 +60,6 @@ class TFRecordWriter(ArchiveWriter):
         example = tf.train.Example(features=features)
         self.writer.write(example.SerializeToString())
         return
-
-    #def open_dst(self):
-        #''' アーカイブのオープン TFRecordWriterではTFRecordWriterオブジェクトを生成する '''
-        #import tensorflow as tf
-        #parent_dir = os.path.dirname(self.dstpath)
-        #if not os.path.exists(parent_dir):
-            #os.makedirs(parent_dir)
-        #if self.writer is None:
-            #option = tf.python_io.TFRecordOptions(
-                #compression_type = tf.python_io.TFRecordCompressionType.NONE)
-            #self.writer = tf.python_io.TFRecordWriter(self.dstpath, options=option)
-            #self.writer.__enter__()
-        #return
-
-    #def close_dst(self):
-        #''' アーカイブのクローズ TFRecordWriterではTFRecordWriterをcloseする '''
-        #if self.writer is not None:
-            #self.writer.flush()
-            #self.writer.close()
-            #self.writer.__exit__(None, None, None)
-            #self.writer = None
-
-    #def _appendNext(self, name, ndarray):
-        #''' iteratorから得た1件のデータを書き込む '''
-        #import tensorflow as tf
-        #features = self.featurefunc(name, ndarray)
-        #example = tf.train.Example(features=features)
-        #self.writer.write(example.SerializeToString())
-        #return
 
     @staticmethod
     def create_feature(encode_func):

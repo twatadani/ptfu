@@ -47,16 +47,6 @@ class TFRecordDataSet(DataSet):
 
     def obtain_minibatch(self, minibatchsize):
         ''' ミニバッチデータを取得する。TFRecordDataSetの場合は、実際にはミニバッチデータを取得するオペレーションを定義する '''
-        #dataset_shuffle_repeat = tf.data.TFRecordDataset(self.srclist_ph).apply(
-        #    tf.contrib.data.shuffle_and_repeat(buffer_size = minibatchsize * 2))
-        #dataset_map_batch = dataset_shuffle_repeat.apply(tf.contrib.data.map_and_batch(
-        #map_func = self._record_parse, #todo
-            #batch_size = minibatchsize,
-            #num_parallel_calls = self.parallel)) # todo
-        #prefetch = dataset_map_batch.prefetch(buffer_size = 10)
-        #iterator = prefetch.make_one_shot_iterator()
-        #iterator = prefetch.make_initializable_iterator()
-        #self.initializer = iterator.initializer
         from ..kernel import kernel
         training_tensor = kernel.get_training_tensor()
         minibatch_op = tf.cond(training_tensor,
@@ -65,7 +55,6 @@ class TFRecordDataSet(DataSet):
             name = 'minibatch_selector'
         )
         return minibatch_op
-        #return self.minibatch_op
 
     def _record_parse(self, example):
         ''' 内部的に使用するTFRecordのパース用関数 '''
@@ -76,7 +65,6 @@ class TFRecordDataSet(DataSet):
         print(featuredict)
         features = tf.parse_single_example(example,features = featuredict)
         print(features)
-        #parseddict = {}
         parsedlist = []
         for l in self.labellist:
             value = features[l]
@@ -84,10 +72,7 @@ class TFRecordDataSet(DataSet):
             if dtype in (tf.float16, tf.float32, tf.float64, tf.int32, tf.uint16, tf.uint8, tf.int16, tf.int8, tf.int64): # これらの型しか許されない
                 print(l)
                 decoded = tf.io.decode_raw(value, out_type = dtype)
-                #parseddict[l] = decoded
-                #print('decoded:', decoded)
                 if self.tensorshape is None:
-                    #parseddict[l] = decoded
                     parsedlist.append(decoded)
                 else:
                     parsedlist.append(tf.reshape(tensor = decoded,
@@ -101,18 +86,16 @@ class TFRecordDataSet(DataSet):
         dataset_shuffle_repeat = dataset.apply(
                             tf.contrib.data.shuffle_and_repeat(buffer_size = minibatchsize * 10))
         dataset_map_batch = dataset_shuffle_repeat.apply(tf.contrib.data.map_and_batch(
-            map_func = self._record_parse, #todo
+            map_func = self._record_parse,
             batch_size = minibatchsize,
-            num_parallel_calls = self.parallel)) # todo
+            num_parallel_calls = self.parallel))
         prefetch = dataset_map_batch.prefetch(buffer_size = minibatchsize)
-        #prefetch = dataset_map_batch
         self.train_iterator = prefetch.make_initializable_iterator()
         self.train_initializer = self.train_iterator.initializer
-        #self.minibatch_op = self.train_iterator.get_next()
 
         # validation用
         validation_map_batch = dataset.apply(tf.contrib.data.map_and_batch(
-            map_func = self._record_parse, #todo
+            map_func = self._record_parse,
             batch_size = minibatchsize,
             num_parallel_calls = self.parallel))
         validation_prefetch = validation_map_batch.prefetch(buffer_size = minibatchsize)
