@@ -39,15 +39,23 @@ class NeuralNet:
 
     def _prepare_training_tensor(self):
         ''' 学習用か検証用かを設定するboolean tensorを設定する '''
-        import tensorflow as tf
-        self.training_tensor = tf.placeholder(dtype=tf.bool,
-                                              shape=(),
-                                              name='training')
+        from ..kernel import kernel
+        #self.training_tensor = tf.placeholder(dtype=tf.bool,
+        #                                      shape=(),
+        #                                      name='training')
+
+        # TFRecord trainingでplaceholder不使用に対応するためVariableとする
+        #self.training_tensor = tf.Variable(True,
+                                           #dtype=tf.bool,
+                                           #shape=(),
+                                           #trainable=False,
+                                           #name='training')
+        self.training_tensor = kernel.get_training_tensor()
         self.inputs['training'] = self.training_tensor
         return
 
-    def get_training_tensor(self):
-        return self.training_tensor
+    #def get_training_tensor(self):
+        #return self.training_tensor
 
     def get_input_tensors(self):
         ''' このNeuralNetの入力tensorのリストを得る '''
@@ -105,6 +113,10 @@ class LayerBasedNeuralNet(NeuralNet):
         options: layerに与えるパラメータ '''
         self.layers.append(NNLayer(layer, **options))
         return
+
+    def lastout(self):
+        ''' 最終レイヤーのoutput tensorを返す '''
+        return self.last_layer().output_tensor()
 
     def print_network(self):
         ''' ネットワーク構造を文字列として表現する。strを返す '''

@@ -13,21 +13,41 @@ class LabelStyle(Enum):
     LABEL_BY_FUNC = auto() # フィルター関数でラベルを切り分ける方式 フィルター関数を別に提供する必要がある
     TFRECORD = auto() # TFRecord内ですでにラベル付けされている状態
 
-class DataSetInfo:
-    ''' DataSetをマルチプロセスで使用するためのpicklableオブジェクト '''
+    #@staticmethod
+    def to_minibatchdict(self, minibatchdata, labellist, **options):
+        ''' datasetから取り出した形式のリストで与えられるminibatchdataをdictの形に変換する '''
+        raise NotImplementedError
 
-    def __init__(self, arg_dictionary):
-        ''' arg_dictionaryはDataSetオブジェクトを構築するための引数の辞書
-        ただし、'class': クラスオブジェクトのフィールドを持つ '''
-        self.dic = arg_dictionary
-        return
+    #@staticmethod
+    def to_minibatchdict_byfunc(self, minibatcdata, labellist, **options):
+        ''' to_minibatcdictのLABEL_BY_FUNC版 
+        optionsにlabelfuncを与える必要がある。labelfuncは1件のデータに対して
+        minibatchdict = labelfunc(minibatchdata, labellist)となるような関数
+        '''
+        labelfunc = options['labelfunc']
+        return labelfunc(minibatcdata, labellist)
+
+
+LabelStyle.LABEL_BY_FUNC.to_minibatchdict = LabelStyle.to_minibatchdict_byfunc
+
+
+
+
+#class DataSetInfo:
+    #''' DataSetをマルチプロセスで使用するためのpicklableオブジェクト '''
+
+    #def __init__(self, arg_dictionary):
+        #''' arg_dictionaryはDataSetオブジェクトを構築するための引数の辞書
+        #ただし、'class': クラスオブジェクトのフィールドを持つ '''
+        #self.dic = arg_dictionary
+        #return
     
-    def constructDataSet(self):
-        ''' このDataSetInfoからDataSetオブジェクトを構築する '''
-        cls = self.dic['class']
-        dataset = cls(self.dic['srclist'], self.dic['labellist'], self.dic['labelstyle'],
-                      **self.dic['options'])
-        return dataset
+    #def constructDataSet(self):
+        #''' このDataSetInfoからDataSetオブジェクトを構築する '''
+        #cls = self.dic['class']
+        #dataset = cls(self.dic['srclist'], self.dic['labellist'], self.dic['labelstyle'],
+                      #**self.dic['options'])
+        #return dataset
     
 
 class DataSet:
@@ -42,401 +62,360 @@ class DataSet:
 
     def __init__(self, srclist, labellist, labelstyle, **options):
         ''' DataSetのイニシャライザ
-        srclist: データセット格納ファイルのリスト
-        labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
-        labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
-        options: labelstyleに依存するオプション '''
+        srclist: データセット格納ファイルのコレクション 単独の場合は単にファイル名でもよい
+        labellist: データラベルのリスト。例えば分類タスクで車、信号、家を分類する場合には['car', 'signal', 'house']を与える
+        labelstyle: LabelStyle enumで選択されるラベルの指定方法
+        options: 
+        labelstyleで使用するオプションは個々で指定する。ほか、
+        storetype: 明示的にソースアーカイブのStoreTypeを指定する場合に使用        
+         '''
 
+        import ptfu.functions as f
+        
+        # self.srclistはsetとして保有する
         if isinstance(srclist, list) or isinstance(srclist, tuple):
+            self.srclist = set(srclist)
+        elif isinstance(srclist, set):
             self.srclist = srclist
-        elif srclist is not None:
-            self.srclist = [srclist]
         else:
-            self.srclist = []
+            self.srclist = set()
+            self.srclist.add(srclist)
+
+        # storetypeは明示的に指定されなければ自動検出する
+        if 'storetype' in options:
+            self.srcstoretype = options['storetype']
+        else:
+            self.srcstoretype = f.autodetect_storetype(self.srclist)
+            assert self.srcstoretype is not None, self.srclist
 
         self.labellist = labellist
         self.labelstyle = labelstyle
+        
+        # データ件数のキャッシュ
+        self.datanumber_cache = None
+
+        # ランダムミニバッチキュー関連のインスタンス変数
+        self.randomq = None
+        self.randomq_minibatchsize = None
+        self.randomq_future = None
+
+        # シリアルミニバッチキュー関連のインスタンス変数
+        self.serialq = None
+        self.serialq_future = None        
+
+        # todo オプションの処理
         self.options = options
         return
 
-    def obtain_minibatch(self, minibatchsize):
-        ''' minibatchsizeで指定されたサイズのミニバッチを取得する。
-        ミニバッチデータは
-        { label1: (minibatchsize, ....), label2: (minibatchsize, ....) }
-        の形式 '''
-        raise NotImplementedError
-
     def datanumber(self):
-        ''' このデータセットのデータ数を得る '''
-        raise NotImplementedError
-        
+        ''' このデータセットのデータ件数を取得する '''
+        if self.datanumber_cache is not None:
+            return self.datanumber_cache
+        else:
+            self.datanumber_cache = 0
+            for src in self.srclist:
+                areader = self.srcstoretype.reader(src, use_cache=False)
+                self.datanumber_cache += areader.datanumber()
+            return self.datanumber_cache
 
-    def toDataSetInfo(self):
-        ''' このオブジェクトをDataSetInfoに変換する '''
-        dic = {}
-        cls = self.__class__
-        dic['class'] = cls
-        dic['srclist'] = self.srclist
-        dic['labellist'] = self.labellist
-        dic['labelstyle'] = self.labelstyle
-        dic['options'] = self.options
-        return DataSetInfo(dic)
-        
+    def start_random_minibatch_queue(self, minibatchsize):
+        ''' バックグラウンドでランダムにミニバッチを作成するプロセスを立ち上げる '''
+        from .dataqueue import DataQueue
+        from ..kernel import kernel
+        if self.randomq is not None:
+            self.stop_random_minibatch_queue()
 
-class NPYDataSet(DataSet):
-    ''' NPYファイルで格納されているデータセット '''
+        executor = kernel.pexecutor
+        self.randomq = DataQueue()
+        self.randomq_minibatchsize = minibatchsize
+        self.randomq_future = executor.submit(self.__class__._randomq_worker, self.randomq, minibatchsize,
+                                            self.srcstoretype, self.srclist,
+                                            self.labellist, self.labelstyle, self.options)
+        return self.randomq
 
-    # class variable
-    diskcachedict = {}
-    
-    def __init__(self, srclist, labellist, labelstyle, **options):
-        ''' NPUYDataSetのイニシャライザ 
-        options内に
-        storetype: StoreTypeメンバ
-        labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)
-        となるようなstoretype, labelfuncが必須 
-        必須ではないオプション:
-        use_diskcache: TrueまたはFalseで指定。デフォルトはFalse
-        temporary directoryに一度読み込んだデータについてはlabelfuncを適用した辞書の状態でキャッシュを作成する。二度目以降の読み込みはdisk cacheを優先する '''
-        from . import SrcReader, DataType
-        from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, wait
-        super(NPYDataSet, self).__init__(srclist, labellist, labelstyle, **options)
-
-        self.readers = []
-        self.namelist = [] # データネームのリスト 実際はreaderごとにリストにするので二重リスト
-
-        self.texecutor = ThreadPoolExecutor()
-        self.pexecutor = ProcessPoolExecutor(1)
-
-        assert 'labelfunc' in options
-        self.labelfunc = options['labelfunc']
-        assert 'storetype' in options
-        futures = []
-        for srcfile in self.srclist:
-            reader = SrcReader(DataType.NPY, options['storetype'], srcfile)
-            self.readers.append(reader)
-            futures.append(self.texecutor.submit(reader.namelist))
-        wait(futures)
-        for future in futures:
-            self.namelist.append(future.result())
-
-        self.namereaderdict = None
-        self.nrdfuture = None
-        self.nrddone = False
-        self.nrdfuture = self.texecutor.submit(self._create_namereaderdict, self.namelist, self.readers)
-        # disk cacheの設定
-        self.use_diskcache = False
-        self.tempdir = None
-        if 'use_diskcache' in options:
-            self.use_diskcache = True
-            self._create_tempdir()
-
+    def stop_random_minibatch_queue(self):
+        ''' ミニバッチキューイングプロセスを停止する '''
+        if self.randomq is not None:
+            self.randomq = None
+            self.randomq_minibatchsize = None
+            self.randomq_future.cancel()
+            self.randomq_future = None
         return
 
-    def __del__(self):
-        ''' デストラクタ '''
-        if hasattr(self, 'tempdir_owner') and self.tempdir_owner is True:
-            self._cleanup_tempdir()
-        if self.texecutor is not None:
-            self.texecutor.shutdown()
-        if self.pexecutor is not None:
-            self.pexecutor.shutdown()
-        return
+    def obtain_random_minibatch(self, minibatchsize):
+        ''' ランダムに取得されるミニバッチを1回分取得する '''
+        if (self.randomq is not None) and (self.randomq_minibatchsize == minibatchsize):
+            #print('キューを使用してミニバッチを取り出します。')
+            minibatch = self.randomq.pop()
+            return minibatch
+        else:
+            #print('warning: キューを使わずにミニバッチを取り出します。')
+            areaders = []
+            for src in self.srclist:
+                areader = self.srcstoretype.reader(src, use_cache=False)
+                areaders.append(areader)
+            minibatchdata = self.__class__._random_minibatchdata(areaders, minibatchsize)
+            minibatchdict = self.labelstyle.to_minibatchdict(self.labelstyle, minibatchdata, self.labellist, **self.options)
+            return minibatchdict
 
-    def datanumber(self):
-        ''' このデータセットのデータ数を得る '''
-        num = 0
-        for reader in self.readers:
-            num += reader.datanumber()
-        return num
+    def obtain_serial_minibatch_queue(self, minibatchsize):
+        ''' 全データを順に取得するミニバッチキューを作成する '''
+        from .dataqueue import DataQueue
+        from ptfu import kernel
+        # minibatch数を計算する
+        ndata = self.datanumber()
+        nbatch = ndata // minibatchsize
+        residue = ndata % minibatchsize
+        if residue != 0:
+            nbatch += 1
+        self.serialq = DataQueue(nbatch)
+        executor = kernel.pexecutor
+        self.serialq_future = executor.submit(self.__class__._serialq_worker, self.serialq, minibatchsize,
+                                            self.srcstoretype, self.srclist, self.labellist, self.labelstyle, self.options)
+        return self.serialq
 
     @staticmethod
-    def _create_namereaderdict(namelist, readers):
-        ''' 格納されている要素の名前からreaderを得られる辞書を作成する '''
-        dic = {}
-        for i, nlist in enumerate(namelist):
-            for name in nlist:
-                dic[name] = readers[i]
-        return dic
-
-    def _cleanup_tempdir(self):
-        ''' テンポラリディレクトリをクリーンアップする '''
-        if hasattr(self, 'tempdir') and self.tempdir is not None:
-            self.tempdir.cleanup()
-            self.tempdir = None
-        return
-
-    def _create_tempdir(self):
-        ''' テンポラリディレクトリを作成する '''
-        from tempfile import TemporaryDirectory
-        from ..logger import get_default_logger
-
-        logger = get_default_logger()
-
-        if not self.srclist[0] in NPYDataSet.diskcachedict:
-            if self.tempdir is None:
-                logger.debug('NPYDataSetのディスクキャッシュを作成します')
-                self.tempdir = TemporaryDirectory()
-                NPYDataSet.diskcachedict[self.srclist[0]] = self.tempdir
-                self.tempdir_owner = True
-        else:
-            logger.debug('NPYDataSetのディスクキャッシュを流用します')
-            self.tempdir = NPYDataSet.diskcachedict[self.srclist[0]]
-            self.tempdir_owner = False
-
-    def obtain_minibatch(self, minibatchsize):
-        ''' minibatchsizeで指定されたサイズのミニバッチを取得する '''
-        import random
-        from concurrent.futures import wait
-
-        # name-reader dictの完成を待つ
-        if self.nrddone is False:
-            wait([self.nrdfuture])
-            self.namereaderdict = self.nrdfuture.result()
-            self.nrddone = True
-
-        # 返り値となるdictを準備
-        minibatch_dict = None
-
-        # ミニバッチ対象となる名前リストを選択する
-        minibatch_namelist = random.sample(self.namereaderdict.keys(), minibatchsize)
-
-        # futures
-        namefutures = []
-
-        # データを取得する
-        for name in minibatch_namelist:
-            namefutures.append(
-                self.texecutor.submit(self._obtain_name, name))
-
-        wait(namefutures)
-        datadicts = map(lambda x: x.result(), namefutures)
-        keys = namefutures[0].result().keys()
-        return self._mergedict(datadicts, keys)
-
-    def _obtain_name(self, name):
-        ''' obtain_minibatch の個々のデータを取得する '''
-
-        from ..logger import get_default_logger
-        logger = get_default_logger()
-
-        datadict = None
-        # まず、ディスクキャッシュを探す
-        if self.use_diskcache:
-            path = os.path.join(self.tempdir.name, name + '.pkl')
-            try:
-                if os.path.exists(path): # ディスクキャッシュにヒット
-                    with open(path, mode='rb') as fp:
-                        datadict = pickle.load(fp)
+    def _serialq_worker(queue, minibatchsize, storetype, srclist, labellist, labelstyle, options):
+        ''' 全データを順に取得し、キューに入れる作業を行うワーカー関数 '''
+        areaders = []
+        namelists = []
+        for src in srclist:
+            areader = storetype.reader(src, use_cache=False)
+            areaders.append(areader)
+            namelist = areader.namelist()
+            namelists.append(namelist)
+        batch_counter = 0 # バッチ番号
+        current_listindex = 0 # 現在使用しているnamelistの番号
+        last_index = 0 # namelist内で最後に取得したindex
+        nbatch = queue.datanumber()
+        while batch_counter < nbatch:
+            current_list = namelists[current_listindex]
+            batch_start = last_index
+            batch_end = last_index + minibatchsize
+            if batch_end <= len(current_list): # ミニバッチがはみでず1リストで完結する場合
+                use_names = current_list[batch_start:batch_end]
+                reader = areaders[current_listindex]
+                minibatchdata = reader.getbylist(use_names)
+                # indexを加算
+                last_index += minibatchsize
+                #current_listindex #はいじらない
+                batch_counter += 1
+            else: # ミニバッチがはみ出て2リストにまたがる場合
+                batch_end = len(current_list)
+                # とりあえず全部取得する
+                if batch_end == batch_start + 1: # ちょうどバッチが終わっていた場合は空リスト
+                    minibatchdata = []
+                else:
+                    reader = areaders[current_listindex]
+                    use_names = current_list[batch_start:batch_end]
+                    minibatchdata = reader.getbylist(use_names)
                     
-            except:
-                datadict = None
-        if datadict is None: # キャッシュにヒットしなかった場合
-            reader = self.namereaderdict[name]
-            obtained = False
-            trycount = 0
-            while (not obtained) and (trycount < 5):
-                try:
-                    trycount += 1
-                    data = reader.getbyname(name)
-                    obtained = True
-                    if trycount >= 2:
-                        logger.debug(str(trycount) + '回で読み込み成功しました')
-                except:
-                    logger.warning('データ読み込みに失敗したため、リトライします trycount = '+ str(trycount))
-            datadict = self.labelfunc(name, data)
-            if self.use_diskcache: # ディスクキャッシュに保存する
-                future = self.pexecutor.submit(self._save_pickle, datadict, path)
-        return datadict
+                    # 次のリストに移行する
+                    current_listindex += 1
+                    if current_listindex < len(namelists): # 次のリストがまだある場合のみ
+                        current_list = namelists[current_listindex]
+                        batch_start = 0
+                        batch_end = minibatchsize - len(use_names) + 1
+                        reader = areaders[current_listindex]
+                        use_names = current_list[batch_start:batch_end]
+                        minibatchdata.extend(reader.getbylist(use_names))
+
+                    # indexを加算
+                    last_index += batch_end
+                    batch_counter += 1
+            minibatchdict = labelstyle.to_minibabtchdict(minibatchdata, labellist, options)
+            queue.push(minibatchdict)
+        return
 
     @staticmethod
-    def _save_pickle(datadict, path):
+    def _randomq_worker(queue, minibatchsize, storetype, srclist, labellist, labelstyle, options, qsize_threashold = 50):
+        ''' ランダムにミニバッチを取得し、キューに入れる作業を繰り返すワーカー関数 '''
+        from time import sleep
+        print('_randomq_workerが起動されました')
         try:
-            with open(path, mode='wb') as fp:
-                pickle.dump(datadict, fp, protocol=pickle.HIGHEST_PROTOCOL)
-        except: # 失敗したら消す 所詮キャッシュなので消しても大丈夫
-            os.remove(path)
-        return
+            areaders = []
+            for src in srclist:
+                areader = storetype.reader(src, use_cache=True)
+                areaders.append(areader)
+        
+        # ミニバッチを取り出すループ
+        
+            while True:
+                #print('loop 1')
+                minibatchdata = DataSet._random_minibatchdata(areaders, minibatchsize)
+                #print('loop 2')
+                minibatchdict = labelstyle.to_minibatchdict(labelstyle, minibatchdata, labellist, **options)
+                #print('loop 3')
+                queue.push(minibatchdict)
+                #print ('loop 4')
+                if queue.qsize() > qsize_threashold:
+                    sleep(2)
+        except:
+            import traceback
+            traceback.print_exc()
 
     @staticmethod
-    def _mergedict(datadicts, keys):
-        ''' ミニバッチデータの辞書に1件のデータ辞書をmergeし、新しいminibatch dictを返す内部用関数 '''
-        import numpy as np
-        
-        datadictlist = tuple(datadicts)
-        minibatchdict = {}
-        
-        for key in keys:
-            listed = None
-            for elementdict in datadictlist:
-                element = elementdict[key]
-                if isinstance(element, np.ndarray):
-                    if listed is None:
-                        listed = element
-                    else:
-                        listed = np.concatenate([listed, element], axis=0)
-                else:
-                    listed = NPYDataSet._flatextend(listed, element)
-            minibatchdict[key] = listed
+    def _random_minibatchdata(readers, minibatchsize):
+        ''' readersまで設定した状態でランダムなminibatchを1回分取得する '''
+        import ptfu.functions as f
+        import random
+        from .datatype import DataType
+        readers_shuffled = random.sample(readers, len(readers))
+        indexes = f.random_split_index(minibatchsize, len(readers))
+        minibatchdata = []
+        for i, reader in enumerate(readers_shuffled):
+            #print('reader', reader)
+            namelist = reader.namelist(DataType.NPY)
+            #print('i:', i, 'len(namelist):', len(namelist), 'indexes[i]', indexes[i])
+            try:
+                getlist = random.sample(namelist, indexes[i])
+                #print('len(getlist)=', len(getlist))
+                data = reader.getbylist(getlist, DataType.NPY)
+                #print('len(data)=', len(data))
+            except:
+                import traceback
+                traceback.print_exc()
+            
+            
+            minibatchdata.extend(data)
+        #print('returning _random_minibatchdata')
+        return minibatchdata
 
-        return minibatchdict
 
-    @staticmethod
-    def _flatextend(elem1, elem2):
-        ''' elem1, elem2を結合してフラットなリストにする '''
-        baselist = []
-        if elem1 is not None:
-            if isinstance(elem1, list):
-                baselist = elem1
-            else:
-                baselist = [ elem1 ]
-                # この時点でbaselistは必ずlist
-                
-        if elem2 is not None:
-            if isinstance(elem2, list):
-                baselist.extend(elem2)
-            else:
-                baselist.append(elem2)
-        return baselist
+    #def __init__(self, srclist, labellist, labelstyle, **options):
+        #''' DataSetのイニシャライザ
+        #srclist: データセット格納ファイルのリスト
+        #labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
+        #labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
+        #options: labelstyleに依存するオプション '''
 
-class TFRecordDataSet(DataSet):
-    ''' TFRecord形式のデータセット '''
+        #if isinstance(srclist, list) or isinstance(srclist, tuple):
+            #self.srclist = srclist
+        #elif srclist is not None:
+            #self.srclist = [srclist]
+        #else:
+            #self.srclist = []
 
-    import tensorflow as tf
+        #self.labellist = labellist
+        #self.labelstyle = labelstyle
+        #self.options = options
+        #return
 
-    def __init__(self, srclist, labellist, **options):
-        ''' TFRecordDataSetのイニシャライザ '''
-        super(TFRecordDataSet, self).__init__(srclist, labellist, None, options)
-        
-        if 'label_dtype' in options:
-            self.label_dtype = options[label_dtype]
-        else:
-            self.label_dtype = None
+    #def obtain_minibatch(self, minibatchsize):
+        #''' minibatchsizeで指定されたサイズのミニバッチを取得する。
+        #ミニバッチデータは
+        #{ label1: (minibatchsize, ....), label2: (minibatchsize, ....) }
+        #の形式 '''
+        #raise NotImplementedError
 
-        if 'parallel' in options:
-            self.parallel = options[parallel]
-        else:
-            self.parallel = 3
-
-    def obtain_minibatch(self, minibatchsize):
-        ''' ミニバッチデータを取得する。TFRecordDataSetの場合は、実際にはミニバッチデータを取得するオペレーションを定義する '''
-        dataset_shuffle_repeat = tf.data.TFRecordDataset(self.srclist).apply(
-            tf.contrib.data.shuffle_and_repeat(buffer_size = minibatchsize * 2))
-        dataset_map_batch = dataset_shuffle_repeat.apply(tf.contrib.data.map_and_batch(
-            map_func = self._record_parse, #todo
-            batch_size = minibatchsize,
-            num_parallel_calls = self.parallel)) # todo
-        prefetch = dataset_map_batch.prefetch(buffer_size = 10)
-        iterator = prefetch.make_one_shot_iterator()
-        return iterator.get_next()
-
-    def _record_parse(self, example):
-        ''' 内部的に使用するTFRecordのパース用関数 '''
-        featuredict = {}
-        for l in self.labellist:
-            featuredict[l] = tf.FixedLenFeature([], dtype=tf.string)
-
-        features = tf.parse_single_example(example,features = featuredict)
-
-        parseddict = {}
-        for l in self.labellist:
-            value = features[l]
-            dtype = self.label_dtype[l] if self.label_dtype is not None else tf.float32
-            parseddict[l] = tf.io.decode_row(value, out_type = dtype)
-        return parseddict
+    #def datanumber(self):
+        #''' このデータセットのデータ数を得る '''
+        #raise NotImplementedError
         
 
-class PILDataSet(DataSet):
-    ''' PILでロードできるフォーマットで格納されたデータセット '''
+    #def toDataSetInfo(self):
+        #''' このオブジェクトをDataSetInfoに変換する '''
+        #dic = {}
+        #cls = self.__class__
+        #dic['class'] = cls
+        #dic['srclist'] = self.srclist
+        #dic['labellist'] = self.labellist
+        #dic['labelstyle'] = self.labelstyle
+        #dic['options'] = self.options
+        #return DataSetInfo(dic)
+        
 
-    def __init__(self, srclist, labellist, labelstyle, datatype, **options):
-        ''' PILDataSetのイニシャライザ
-        srclist: データセット格納ファイルのリスト
-        labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
-        labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
-        datatype: 具体的なデータタイプ。DataType enumから選択する
-        options内に
-        storetype: StoreTypeメンバ、
-        labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)となるような
-        storetype, labelfuncが必須 '''
-        from . import SrcReader, DataType
-        super(PILDataSet, self).__init__(srclist, labellist, labelstyle, **options)
 
-        self.readers = []
-        self.datatype = datatype
-        for srcfile in self.srclist:
-            reader = SrcReader(datatype, options['storetype'], srcfile)
-            self.readers.append(reader)
 
-        assert 'labelfunc' in options
-        self.labelfunc = options['labelfunc']
-        return
+        
 
-    def datanumber(self):
-        ''' このデータセットのデータ数を得る '''
-        num = 0
-        for reader in self.readers:
-            num += reader.datanumber()
-        return num
+#class PILDataSet(DataSet):
+    #''' PILでロードできるフォーマットで格納されたデータセット '''
 
-    def obtain_minibatch(self, minibatchsize):
-        ''' minibatchsizeで指定されたサイズのミニバッチを取得する。
-        ミニバッチデータは
-        { label1: (minibatchsize, ....), label2: (minibatchsize, ....) }
-        の形式 '''
-        raise NotImplementedError
+    #def __init__(self, srclist, labellist, labelstyle, datatype, **options):
+        #''' PILDataSetのイニシャライザ
+        #srclist: データセット格納ファイルのリスト
+        #labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
+        #labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
+        #datatype: 具体的なデータタイプ。DataType enumから選択する
+        #options内に
+        #storetype: StoreTypeメンバ、
+        #labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)となるような
+        #storetype, labelfuncが必須 '''
+        #from . import SrcReader, DataType
+        #super(PILDataSet, self).__init__(srclist, labellist, labelstyle, **options)
 
-    def obtain_wholedata(self):
-        ''' すべてのデータを取得する。返り値は
-        { label1: (minibatchsize, ...), label2: (minibatchsize, ...) }
-        の辞書形式 '''
-        datadict = None
+        #self.readers = []
+        #self.datatype = datatype
+        #for srcfile in self.srclist:
+            #reader = SrcReader(datatype, options['storetype'], srcfile)
+            #self.readers.append(reader)
 
-        for reader in self.readers:
-            iterator = reader.iterator()
-            for name, npy in iterator:
-                singledict = self.labelfunc(name, npy)
+        #assert 'labelfunc' in options
+        #self.labelfunc = options['labelfunc']
+        #return
+
+    #def datanumber(self):
+        #''' このデータセットのデータ数を得る '''
+        #num = 0
+        #for reader in self.readers:
+            #num += reader.datanumber()
+        #return num
+
+    #def obtain_minibatch(self, minibatchsize):
+        #''' minibatchsizeで指定されたサイズのミニバッチを取得する。
+        #ミニバッチデータは
+        #{ label1: (minibatchsize, ....), label2: (minibatchsize, ....) }
+        #の形式 '''
+        #raise NotImplementedError
+
+    #def obtain_wholedata(self):
+        #''' すべてのデータを取得する。返り値は
+        #{ label1: (minibatchsize, ...), label2: (minibatchsize, ...) }
+        #の辞書形式 '''
+        #datadict = None
+
+        #for reader in self.readers:
+            #iterator = reader.iterator()
+            #for name, npy in iterator:
+                #singledict = self.labelfunc(name, npy)
                 #assert singledict is not None
-                if datadict is None:
-                    datadict = singledict
-                else:
-                    datadict = NPYDataSet._mergedict([datadict, singledict], datadict.keys())
+                #if datadict is None:
+                    #datadict = singledict
+                #else:
+                    #datadict = NPYDataSet._mergedict([datadict, singledict], datadict.keys())
 
-        return datadict
+        #return datadict
 
-class JPGDataSet(PILDataSet):
-    ''' JPEG画像が格納されているデータセット '''
+#class JPGDataSet(PILDataSet):
+    #''' JPEG画像が格納されているデータセット '''
 
-    def __init__(self, srclist, labellist, labelstyle, **options):
-        ''' JPGDataSetのイニシャライザ
-        srclist: データセット格納ファイルのリスト
-        labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
-        labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
-        options内に
-        storetype: StoreTypeメンバ、
-        labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)となるような
-        storetype, labelfuncが必須 '''
-        from . import DataType
-        super(JPGDataSet, self).__init__(srclist, labellist, labelstyle, DataType.JPG, **options)
-        return
+    #def __init__(self, srclist, labellist, labelstyle, **options):
+        #''' JPGDataSetのイニシャライザ
+        #srclist: データセット格納ファイルのリスト
+        #labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
+        #labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
+        #options内に
+        #storetype: StoreTypeメンバ、
+        #labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)となるような
+        #storetype, labelfuncが必須 '''
+        #from . import DataType
+        #super(JPGDataSet, self).__init__(srclist, labellist, labelstyle, DataType.JPG, **options)
+        #return
 
-class PNGDataSet(PILDataSet):
-    ''' PNG画像が格納されているデータセット '''
+#class PNGDataSet(PILDataSet):
+    #''' PNG画像が格納されているデータセット '''
 
-    def __init__(self, srclist, labellist, labelstyle, **options):
-        ''' PNGDataSetのイニシャライザ
-        srclist: データセット格納ファイルのリスト
-        labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
-        labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
-        datatype: 具体的なデータタイプ。DataType enumから選択する
-        options内に
-        storetype: StoreTypeメンバ、
-        labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)となるような
-        storetype, labelfuncが必須 '''
-        from . import DataType
-        super(PNGDataSet, self).__init__(srclist, labellist, labelstyle, DataType.PNG, **options)
-        return
-
-
-
-
+    #def __init__(self, srclist, labellist, labelstyle, **options):
+        #''' PNGDataSetのイニシャライザ
+        #srclist: データセット格納ファイルのリスト
+        #labellist: ['label1, 'label2', ...]のようなデータラベルのリスト
+        #labelstyle: どのような方式でラベルデータを設定するか。LabelStyle enumから選択する。
+        #datatype: 具体的なデータタイプ。DataType enumから選択する
+        #options内に
+        #storetype: StoreTypeメンバ、
+        #labelfunc: 1データ当たりのlabel切り分け辞書 = labelfunc(name, data)となるような
+        #storetype, labelfuncが必須 '''
+        #from . import DataType
+        #super(PNGDataSet, self).__init__(srclist, labellist, labelstyle, DataType.PNG, **options)
+        #return

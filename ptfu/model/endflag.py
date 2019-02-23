@@ -67,16 +67,27 @@ class TensorValueEndFlag(EndFlag):
         ''' ncontinue: 何回分の値を使うか '''
         super(TensorValueEndFlag, self).__init__()
         self.tensor = tensor
+        self.ncontinue = ncontinue
         self.lastvalues = []
 
+    def setSmartSession(self, smartsession):
+        ''' SmartSessionを設定する '''
+        self.smartsession = smartsession
+        self.smartsession.register_endflag_tensor(self.tensor)
+        return
+
     def update_lastvalues(self):
-        last_fetches = self.smartsession.get_last_fetches()
-        if last_fetches is None:
-            return
-        lastvalue = self.smartsession.get_last_fetches()[self.tensor]
-        self.lastvalues.append(lastvalue)
-        if len(self.lastvalues) > self.ncontinue:
-            self.lastvalues = self.lastvalues[(len(self.lastvalues)-self.ncontinue):]
+        #last_fetches = self.smartsession.get_last_fetches_dict()
+        #if last_fetches is None:
+            #return
+        #elif isinstance(last_fetches, list) or isinstance(last_fetches, tuple):
+        if self.smartsession.last_tensorvaluedict_endflag is not None:
+            lastvalue = self.smartsession.last_tensorvaluedict_endflag[self.tensor]
+            self.lastvalues.append(lastvalue)
+        
+            # リストの長さを調節する
+            if len(self.lastvalues) > self.ncontinue:
+                self.lastvalues = self.lastvalues[(len(self.lastvalues)-self.ncontinue):]
         return
 
 class LossNaNEndFlag(TensorValueEndFlag):
@@ -106,7 +117,7 @@ class LossNaNEndFlag(TensorValueEndFlag):
         if not self.should_end():
             return 'LossNaNEndFlag: 終了条件に該当しません。'
         else:
-            return str(ncontinue) + '回連続で損失関数がNaNとなったため'
+            return str(self.ncontinue) + '回連続で損失関数がNaNとなったため'
 
 class TensorSmallerEndFlag(TensorValueEndFlag):
     ''' あるtensorの値が一定より下回ったら終了する条件 '''
@@ -125,7 +136,7 @@ class TensorSmallerEndFlag(TensorValueEndFlag):
         if len(self.lastvalues) == 0:
             return False
 
-        return self.calculate_tensorsum() <= threshold * ncontinue
+        return self.calculate_tensorsum() <= self.threshold * self.ncontinue
         
     def calculate_tensorsum(self):
         tensorsum = 0
@@ -135,7 +146,8 @@ class TensorSmallerEndFlag(TensorValueEndFlag):
 
     def reason(self):
         if self.should_end():
-            return str(self.tensor) + 'の値が' + str(self.threshold) + '以下となったため。'
+            return str(self.tensor) + 'の値が' + str(self.threshold) + '以下となったため。value=' + \
+                str(self.calculate_tensorsum() / self.ncontinue)
         else:
             return '終了条件に該当しません。'
 
@@ -180,6 +192,7 @@ class OrEndFlag(EndFlag):
 
     def reason(self):
         ''' 学習終了の理由 '''
+        import os
         reason1 = self.flag1.reason()
         reason2 = self.flag2.reason()
 

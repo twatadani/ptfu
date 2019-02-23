@@ -90,8 +90,8 @@ class TFConfig:
                 gpu_options = gpu_options,
                 allow_soft_placement = True)
             # XLA JITコンパイルを有効にする(GPUのみ)
-            if self.use_xla:
-                cp.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+            #if self.use_xla:
+                #cp.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
 
         else:
             # 環境変数でGPUを制限する
@@ -137,7 +137,7 @@ class TFConfig:
                 gpuprefix = '/GPU:'
                 xlaprefix = '/XLA_GPU:'
                 
-                if self_use_xla:
+                if self.use_xla:
                     prefix = xlaprefix
                 else:
                     prefix = gpuprefix
@@ -145,9 +145,11 @@ class TFConfig:
                 ngpu_per_tower = len(self.gpu_list)
                 
                 tw_start = i * ngpu_per_tower
-                tw_end = tw_start + ngpu_per_tower - 1
+                #print('tw_start = ', tw_start)
+                tw_end = tw_start + ngpu_per_tower
+                #print('tw_end = ', tw_end)
                 if i == self.ntowers() - 1:
-                    tw_end = len(self.gpu_list) - 1
+                    tw_end = len(self.gpu_list)
 
                 tower = []
                 for gpunum in self.gpu_list[tw_start:tw_end]:
