@@ -4,11 +4,16 @@ import tensorflow as tf
 import os.path
 from concurrent.futures import ThreadPoolExecutor
 
+from .smartsessionhook import SmartSessionHook
+from .loopsmartsessionhook import LoopSmartSessionHook
+from .onetimesmartsessionhook import OneTimeSmartSessionHook
+
 class SmartSession:
     ''' TensorflowのSessionと同様のinterfaceで多機能化したクラス '''
 
     def __init__(self, tfconfig, session_initialization_ops=None, initialization_feed_dict=None):
         ''' イニシャライザ TFConfigクラスのインスタンスを引数に与える '''
+        from .loopsmartsessionhook import LoopSmartSessionHook
 
         self.tfconfig = tfconfig
         self.last_global_step = 0
@@ -28,19 +33,19 @@ class SmartSession:
                 self.fetches_extended.append(self.merged)
             self.last_summary = None
             initial_hooks.append(
-                SmartSessionHook(hook_func = self._write_summary,
-                                 hook_step = self.tfconfig.summary_save_interval,
-                                 hook_mod = 1,
-                                 synchronous = False,
-                                 hook_name = 'write_summary'))
+                LoopSmartSessionHook(hook_func = self._write_summary,
+                                     hook_step = self.tfconfig.summary_save_interval,
+                                     hook_mod = 1,
+                                     synchronous = False,
+                                     hook_name = 'write_summary'))
 
         if self.tfconfig.use_checkpoint:
             initial_hooks.append(
-                SmartSessionHook(hook_func = self._save_checkpoint,
-                                 hook_step = self.tfconfig.checkpoint_save_interval,
-                                 hook_mod = 0,
-                                 synchronous = True,
-                                 hook_name='save_checkpoint'))
+                LoopSmartSessionHook(hook_func = self._save_checkpoint,
+                                     hook_step = self.tfconfig.checkpoint_save_interval,
+                                     hook_mod = 0,
+                                     synchronous = True,
+                                     hook_name='save_checkpoint'))
 
         self.registerHooks(initial_hooks)
 
@@ -58,6 +63,7 @@ class SmartSession:
             self._register_initialize_ops(session_initialization_ops,
                                           initialization_feed_dict)
 
+        self.initial_hooks_toberun = False
         return
         
 
@@ -99,13 +105,15 @@ class SmartSession:
                 chkp_loaded = False
         
         if not chkp_loaded: # 再開しない設定、または読み込めなかったとき
-            self.run_hooks(0)
+            self.initial_hooks_toberun = True
+            #self.run_initial_or_final_hooks(True)
         return self
 
 
     def __exit__(self, exc_type, exc_value, traceback):
         ''' with構文終了時の処理 '''
         if self.session is not None:
+            self.run_initial_or_final_hooks(False)
             self.session.close()
 
         if exc_type is None: #例外なしで終了したとき
@@ -125,6 +133,11 @@ class SmartSession:
     def run(self, fetches, feed_dict=None, options=None, run_metadata=None, run_hooks=True):
         '''Session.runへのwrapper
         run_hooks: このrunでhookを実行するかどうか。hookを実行したくない場合はFalseにする '''
+
+        # initial hookを走らせる
+        if run_hooks == True and self.initial_hooks_toberun == True:
+            self.run_initial_or_final_hooks(True)
+            self.initial_hooks_toberun = False
 
         # 呼び出し側から与えられた評価対象に自動で評価する対象を追加する
         finalfetches = set()
@@ -153,8 +166,6 @@ class SmartSession:
                                   feed_dict,
                                   options,
                                   run_metadata)
-
-
 
         # 結果をdictに整理して保存する。
         # 全部
@@ -188,8 +199,8 @@ class SmartSession:
         
         # stepに応じて登録されたhookを実行
         if run_hooks:
-            self.run_hooks(self.last_global_step, feed_dict=feed_dict,
-                           options=options, run_metadata=run_metadata)
+            self.run_loop_hooks(self.last_global_step, feed_dict=feed_dict,
+                                options=options, run_metadata=run_metadata)
 
         return self.last_fetches
 
@@ -203,17 +214,17 @@ class SmartSession:
         個々のhookはSmartSessionHookのインスタンス '''
 
         if isinstance(hook_list, list) or isinstance(hook_list, tuple):
-            print('list mode')
+            #print('list mode')
             if self.hooks is None:
-                print('self.hooks is None')
+                #print('self.hooks is None')
                 self.hooks = hook_list
                 self.executor = ThreadPoolExecutor()
             else:
                 self.hooks.extend(hook_list)
         else:
-            print('single mode')
+            #print('single mode')
             if self.hooks is None:
-                print('self.hooks is None')
+                #print('self.hooks is None')
                 self.hooks = [hook_list]
                 self.executor = ThreadPoolExecutor()
             else:
@@ -228,24 +239,163 @@ class SmartSession:
         ''' 最新のrunの結果を返す '''
         return self.last_fetches_dict
 
-    def run_hooks(self, global_step, feed_dict=None, options=None, run_metadata=None):
+    # def run_hooks(self, global_step, feed_dict=None, options=None, run_metadata=None):
 
-        for hook in self.hooks:
+    #     for hook in self.hooks:
 
-            tensorvaluedic = {}
-            if len(hook.tensorlist) > 0:
-                values = self.session.run(hook.tensorlist, feed_dict, options, run_metadata)
-            else:
-                values = []
-            for i, tensor in enumerate(hook.tensorlist):
-                tensorvaluedic[tensor] = values[i]
+    #         tensorvaluedic = {}
+    #         if len(hook.tensorlist) > 0:
+    #             values = self.session.run(hook.tensorlist, feed_dict, options, run_metadata)
+    #         else:
+    #             values = []
+    #         for i, tensor in enumerate(hook.tensorlist):
+    #             tensorvaluedic[tensor] = values[i]
 
-            if hook.mod == global_step % hook.step:
-                if hook.sync:
-                    hook(tensorvaluedic)
-                else:
-                    future = self.executor.submit(hook, tensorvaluedic)
+    #         if hook.mod == global_step % hook.step:
+    #             if hook.sync:
+    #                 hook(tensorvaluedic)
+    #             else:
+    #                 future = self.executor.submit(hook, tensorvaluedic)
+    #     return
+
+    def run_initial_or_final_hooks(self, initial=True, feed_dict=None, options=None, run_metadata=None):
+        ''' 初期hookを実行する 
+        initial: Trueの場合initial hookを、Falseの場合final hookを実行する '''
+        judge_func = lambda hook: hook.run_at_startup if initial else hook.run_at_shutdown
+        self._run_hook_common(judge_func, feed_dict, options, run_metadata)
         return
+
+        #print('run_initial_or_final_hooksが起動されました。initial=', initial)
+
+        # tensortensordict = self._create_tensortensordict(self.hooks, mode=SmartSessionHook.ALL)
+        # if len(tensortensordict) > 0:
+        #     mastertensorvaluedict = self.session.run(tensortensordict)
+        # else:
+        #     mastertensorvaluedict = {}
+        # futures = []
+        # for hook in self.hooks:
+        #     #print('hookをチェックしています。hookname=', hook.hookname)
+        #     check_variable = hook.run_at_startup if initial else hook.run_at_shutdown
+        #     print('check_variable:', check_variable)
+        #     if check_variable == True:
+        #         tensorvaluedict = self.__class__._extract_tensorvaluedict(mastertensorvaluedict,
+        #                                                                   hook.tensorlist)
+        #         #print(hook.hookname, 'を起動します。')
+        #         if hook.sync:
+        #             futures.append(self._run_hook_impl(hook, tensorvaluedict))
+        #         else:
+        #             future = self._run_hook_impl(hook, tensorvaluedict)
+        #             self.executor.submit(self.__class__._run_future_exc_print, future, logger)
+        # if len(futures) > 0:
+        #     wait(futures)
+        #     for future in futures:
+        #         exc = future.exception()
+        #         if exc is not None:
+        #             print(exc)
+        # return
+        
+
+    def run_loop_hooks(self, global_step, feed_dict=None, options=None, run_metadata=None):
+        ''' loop hookを実行する '''
+        judge_func = lambda hook: (isinstance(hook, LoopSmartSessionHook) and \
+                                   hook.mod == global_step % hook.step) or \
+            (isinstance(hook, OneTimeSmartSessionHook) and hook.step == global_step)
+        self._run_hook_common(judge_func, feed_dict, options, run_metadata)
+
+        # from concurrent.futures import wait
+        # from .logger import get_default_logger
+        # logger = get_default_logger()
+        # tensortensordict = self._create_tensortensordict(self.hooks, mode=SmartSessionHook.LOOP)
+        # if len(tensortensordict) > 0:
+        #     mastertensorvaluedict = self.session.run(tensortensordict, feed_dict, options,
+        #                                              run_metadata)
+        # else:
+        #     mastertensorvaluedict = {}
+        # futures = []
+        # for hook in self.hooks:
+        #     if (isinstance(hook, LoopSmartSessionHook) and \
+        #         hook.mod == global_step % hook.step) or \
+        #     (isinstance(hook, OneTimeSmartSessionHook) and hook.step == global_step):
+        #         tensorvaluedict = self._extract_tensorvaluedict(mastertensorvaluedict,
+        #                                                         hook.tensorlist)
+        #         print(hook.hookname, 'を起動します')
+        #         if hook.sync:
+        #             futures.append(self._run_hook_impl(hook, tensorvaluedict))
+        #         else:
+        #             future = self._run_hook_impl(hook, tensorvaluedict)
+        #             self.executor.submit(self.__class__._run_future_exc_print, future, logger)
+        # if len(futures) > 0:
+        #     wait(futures)
+        #     for future in futures:
+        #         exc = future.exception()
+        #         if exc is not None:
+        #             print(exc)
+        # return
+
+    def _run_hook_common(self, hook_judge_func, feed_dict=None, options=None, run_metadata=None):
+        ''' run_loop_hookとrun_initial_or_final_hookの共通部分を記載 '''
+        from concurrent.futures import wait
+        from .logger import get_default_logger
+        logger = get_default_logger()
+        tensortensordict = self._create_tensortensordict(self.hooks, mode=SmartSessionHook.LOOP)
+        if len(tensortensordict) > 0:
+            mastertensorvaluedict = self.session.run(tensortensordict, feed_dict, options,
+                                                     run_metadata)
+        else:
+            mastertensorvaluedict = {}
+        futures = []
+        for hook in self.hooks:
+            if hook_judge_func(hook) == True:
+                tensorvaluedict = self._extract_tensorvaluedict(mastertensorvaluedict,
+                                                                hook.tensorlist)
+                if hook.sync:
+                    futures.append(self._run_hook_impl(hook, tensorvaluedict))
+                else:
+                    future = self._run_hook_impl(hook, tensorvaluedict)
+                    self.executor.submit(self.__class__._run_future_exc_print, future, logger)
+                if len(futures) > 0:
+                    wait(futures)
+                    for future in futures:
+                        exc = future.exception()
+                        if exc is not None:
+                            logger.error(str(exc))
+        return
+
+
+    @staticmethod
+    def _run_future_exc_print(future, logger):
+        ''' 与えられたfutureが完了するのを待ち、例外が発生していたらプリントする '''
+        from concurrent.futures import wait
+        wait(future)
+        exc = future.exception()
+        if exc is not None:
+            logger.error(str(exc))
+        return
+
+    @staticmethod
+    def _create_tensortensordict(hooks, mode=SmartSessionHook.LOOP):
+        ''' hooksから必要とされるtensor-tensor dictを作成する '''
+        hooktype = None
+        if mode == SmartSessionHook.ONETIME:
+            hoooktype = OneTimeSmartSessionHook
+        elif mode == SmartSessionHook.LOOP:
+            hooktype = LoopSmartSessionHook
+        else:
+            hooktype = SmartSessionHook
+        ttset = set()
+        for hook in hooks:
+            if isinstance(hook, hooktype):
+                ttset = ttset | set(hook.tensorlist)
+        return { x: x for x in ttset }
+
+    @staticmethod
+    def _extract_tensorvaluedict(masterdict, tensorlist):
+        ''' { tensor: value, ...} 形式のmasterdictからtensorlistに含まれるものだけを抽出する '''
+        return { x: masterdict[x] for x in tensorlist }
+
+    def _run_hook_impl(self, hook, tensorvaluedict):
+        return self.executor.submit(hook, tensorvaluedict)
+        
 
     def _write_summary(self):
         ''' summary書き出し用のhook関数 '''
@@ -279,51 +429,6 @@ class SmartSession:
             logger.warning('続行します。')
             return
 
-class SmartSessionHook:
-    ''' SmartSessionの学習ループ中に実行されるhook関数を表すクラス '''
-
-    def __init__(self, hook_func=None, hook_step=1, hook_mod=0, synchronous=True,
-                 required_tensor_list=None, hook_name=None, **funcoptions):
-        '''
-        hook_func: 呼び出される関数。hook_funcはhook_func(tensorvaluedict)の形式で呼び出される。
-        hook_step: 何ステップ毎にhook_funcが呼び出されるか
-        hook_mod: step % hook_step = hook_modの時に呼び出される
-        synchronous: Trueの場合同一スレッドで実行される。Falseの場合新しいスレッドで実行される。
-        required_tensor_list: このhook実行に必要なtensorのリスト 
-        funcoptions: hook_funcに与えるオプション
-        '''
-        self.func = hook_func if hook_func is not None else self.dummy
-        self.step = hook_step
-        self.mod = hook_mod
-        self.sync = synchronous
-        if required_tensor_list is None:
-            self.tensorlist = []
-        else:
-            self.tensorlist = required_tensor_list
-        if hook_name is not None:
-            self.hookname = hook_name
-
-        if funcoptions is not None:
-            self.funcoptions = funcoptions
-        return
-
-    def __call__(self, tensorvaluedict):
-        ''' hook_funcを呼び出す '''
-        if self.tensorlist is None or len(self.tensorlist) == 0:
-            if self.funcoptions is None:
-                return self.func()
-            else:
-                return self.func(**self.funcoptions)
-        else:
-            if self.funcoptions is None:
-                return self.func(tensorvaluedict)
-            else:
-                return self.func(tensorvaluedict, **self.funcoptions)
-
-            
-    def dummy(self):
-        ''' 何もしないダミー関数 '''
-        return
             
         
         

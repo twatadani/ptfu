@@ -6,6 +6,7 @@ class TFConfig:
     # class constant
     CPU = '/CPU:0'
     XLA_CPU = '/XLA_CPU:0'
+    XLA_GPU = '/XLA_GPU:0'
 
     def __init__(self, **kwargs):
         ''' TFConfig イニシャライザ

@@ -10,6 +10,6 @@ class TypeReader:
         return
 
     def read(self, bytesio_or_file):
-        ''' BytesIOまたはファイルパスを与え、ndarrayの形式で読み出す。
+        ''' BytesIOまたはファイルパスを与え、datadictの形式で読み出す。
         実際の動作は具象クラスで定義する。 '''
         raise NotImplementedError

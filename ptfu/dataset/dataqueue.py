@@ -70,13 +70,19 @@ class DataQueue:
 
     def push(self, data):
         ''' キューにデータを追加する '''
+        lock_acquired = False
         try:
             self.pushlock.acquire()
+            lock_acquired = True
             self.q.put(data)
             self.pushed.value += 1
             self.pushlock.release()
+            lock_acquired = False
             return
         except:
+            if lock_acquired:
+                self.pushlock.release()
+                lock_acquired = False
             import traceback
             traceback.print_exc()
 

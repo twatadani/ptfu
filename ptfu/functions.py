@@ -68,9 +68,9 @@ def random_split_index(minibatchsize, nsplit):
     generated = []
     residue = minibatchsize
     for i in range(nsplit-1):
-        random = random.randint(0, residue)
-        generated.append(random)
-        residue -= random
+        ranint = random.randint(0, residue)
+        generated.append(ranint)
+        residue -= ranint
     # 最後の1個は帳尻合わせ
     last = residue
     generated.append(last)

@@ -22,19 +22,15 @@ class ArchiveReader:
         '''
         from .storetype import StoreType
         import os.path
-        #from threading import Lock
-        
 
         # StoreTypeの設定
         assert isinstance(storetype, StoreType)
         self.storetype = storetype
 
-        #self.datatype = srcdatatype
         self.srcpath = srcpath
         if isinstance(srcpath, str):
             self.srcpath = os.path.expanduser(self.srcpath)
 
-        #self.typereader = self.datatype.reader()
         self.use_cache = use_cache
         if use_cache == True:
             from .cachewriter import CacheWriter
@@ -52,7 +48,6 @@ class ArchiveReader:
             if self.diskcache is not None:
                 self.dcreader = CacheReader(self.diskcache)
 
-        #self.readlock = Lock()
         self.datanumber_cache = None
         self.namelist_cache = None
         return
@@ -90,7 +85,6 @@ class ArchiveReader:
     def namelist(self, datatype, allow_cached=True):
         ''' 格納されているアーカイブメンバのうち、datatypeにマッチするものの名前のコレクションを返す
         具象クラスで実際の動作を定義する '''
-        #return list(self.arclist())
         raise NotImplementedError
 
     def getbyname(self, name, datatype):
@@ -164,10 +158,10 @@ class ArchiveReader:
             except:
                 import traceback
                 traceback.print_exc()
-            if len(cacheset) > 0:
-                print('メモリキャッシュ上で', len(hitnames), '件ヒットしました!')
-            else:
-                print('メモリキャッシュにはヒットしませんでした。')
+            #if len(cacheset) > 0:
+                #print('メモリキャッシュ上で', len(hitnames), '件ヒットしました!')
+            #else:
+                #print('メモリキャッシュにはヒットしませんでした。')
             # 取得したデータをすべてqueueに入れる
             if len(cacheset) > 0:
                 queue.putAll(cacheset)
@@ -185,10 +179,12 @@ class ArchiveReader:
             except:
                 import traceback
                 traceback.print_exc()
-            if len(cacheset) > 0:
-                print('ディスクキャッシュ上で', len(hitnames), '件ヒットしました!')
-            else:
-                print('ディスクキャッシュにはヒットしませんでした。')
+            #if len(cacheset) > 0:
+                #print('ディスクキャッシュ上で', len(hitnames), '件ヒットしました!')
+                #pass
+            #else:
+                #pass
+                #print('ディスクキャッシュにはヒットしませんでした。')
             # 取得したデータをすべてqueueに入れる
             if len(cacheset) > 0:
                 queue.putAll(cacheset)
@@ -254,10 +250,10 @@ class ArchiveReader:
         for name in partial_list:
             try:
                 if isinstance(fp, MemCache):
-                    data = fp.read(name)
+                    data = fp.read(name) # dataはdict
                 else:
                     path = findname_func(fp, name)
-                    data = datatype.reader().read(path)
+                    data = datatype.reader().read(path) # dataはdict
                 if data is not None:
                     tup = (name, data)
                     queue.push(tup)

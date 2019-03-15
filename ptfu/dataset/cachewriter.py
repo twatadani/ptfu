@@ -23,8 +23,8 @@ class CacheWriter(ArchiveWriter):
         self.fp = None
         return
 
-    def _write_func(self, name, ndarray):
-        ''' ソースがオープンされていることを前提にname, ndarrayで
+    def _write_func(self, name, datadict):
+        ''' ソースがオープンされていることを前提にname, datadictで
         与えられる1件のデータを書き込む 
         '''
-        self.dstpath.write(name, ndarray)
+        self.dstpath.write(name, datadict)

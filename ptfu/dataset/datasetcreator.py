@@ -121,7 +121,7 @@ class DatasetCreator:
 
     def create(self, filter_func=None, logger=None):
         ''' 設定をfixしてデータセット作成を行う
-        filter_func: 読み込まれたndarrayから書き込むndarrayへのフィルター関数 Noneの場合はそのまま書き込む
+        filter_func: 読み込まれたdatadictから書き込むdatadictへのフィルター関数 Noneの場合はそのまま書き込む
         logger: ロギングを行う。Noneの場合はptfu default loggerを使用する
         '''
         from concurrent.futures import wait
@@ -222,15 +222,17 @@ class DatasetCreator:
     @staticmethod
     def _dofilter(filter_func, srcq, dstq):
         ''' srcqのデータを1件ずつ取り出し、filter_funcを適用してdstqに入れる '''
-        print('_dofilterが呼び出されました srcq pushed =', srcq.pushednumber())
         try:
-            print('srcq.hasnext=', srcq.hasnext())
             while srcq.hasnext():
-                data = srcq.pop() # (name, ndarray)
+                data = srcq.pop() # (name, datadict)またはdatadict
                 if data is not None:
-                    filtered = filter_func(data[1])
-                    tup = (data[0], filtered)
-                    dstq.push(tup)
+                    if isinstance(data, dict):
+                        filtered = filter_func(data)
+                        dstq.push(filtered)
+                    else:
+                        filtered = filter_func(data[1])
+                        tup = (data[0], filtered)
+                        dstq.push(tup)
         except:
             import traceback
             traceback.print_exc()

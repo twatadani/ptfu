@@ -4,8 +4,7 @@ from .archivewriter import ArchiveWriter
 
 import os
 import os.path
-
-import numpy as np
+import pickle
 
 class DirWriter(ArchiveWriter):
     ''' 生のディレクトリ内にファイルを格納するWriter '''
@@ -26,8 +25,9 @@ class DirWriter(ArchiveWriter):
         ''' アーカイブファイルをクローズする。DirWriterでは何もしない '''
         return
 
-    def _write_func(self, name, ndarray):
-        ''' ソースがオープンされていることを前提にname, ndarrayで与えられる1件のデータを書き込む '''
-        fullname = os.path.join(self.dstpath, name + '.npy')
-        np.save(fullname, ndarray, allow_pickle=False)
+    def _write_func(self, name, datadict):
+        ''' ソースがオープンされていることを前提にname, datadictで与えられる1件のデータを書き込む '''
+        fullname = os.path.join(self.dstpath, name + '.pkl')
+        with open(fullname, mode='wb') as f:
+            pikle.dump(datadict, f)
         return

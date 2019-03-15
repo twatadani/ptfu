@@ -5,6 +5,8 @@ class Model:
 
     def __init__(self):
         self.gstep = None
+        self.trainhooks = []
+        self.validationstep = None
         return
 
     def train(self, **options):
@@ -23,3 +25,19 @@ class Model:
         if self.gstep is None:
             self.gstep = train.create_global_step()
         return self.gstep
+
+    def validation_step_tensor(self):
+        ''' validation stepを表すtensorを返す '''
+        import tensorflow as tf
+        if self.validationstep is None:
+            self.validationstep = tf.Variable(initial_value = 0,
+                                              dtype = tf.int64,
+                                              trainable = False,
+                                              name = 'validation_step')
+        return self.validationstep
+
+    def register_trainhook(self, smartsessionhook):
+        ''' 学習時のhookを登録する。ここで登録されたhookはtrainの際に自動的に呼び出される '''
+        from ..smartsessionhook import SmartSessionHook
+        if isinstance(smartsessionhook, SmartSessionHook):
+            self.trainhooks.append(smartsessionhook)

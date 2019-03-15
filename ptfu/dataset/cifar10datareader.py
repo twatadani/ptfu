@@ -14,8 +14,21 @@ class Cifar10DataReader(TypeReader):
 
     def read(self, bytesio_or_file):
         ''' BytesIOまたはファイルパスを与え、ndarrayの形式で読み出す。
-        Cifar10の場合はすでにndarrayの形で与えられるので、整形して返す '''
-        ndarray = bytesio_or_file
+        CIFAR10の場合、_find_nameが特殊で(fp, index)の形式で与えられる。'''
+        fp = bytesio_or_file[0]
+        index = bytesio_or_file[1]
+
+        data = fp[b'data']
+        names = fp[b'filenames']
+        labels = fp[b'labels']
+
+        ndarray = data[index]
         ndarray = np.reshape(ndarray, (3, 32, 32)).transpose(1, 2, 0)
-        return ndarray
+
+        datadict = {}
+        datadict['name'] = names[index].decode()
+        datadict['data'] = ndarray
+        datadict['label'] = labels[index]
+
+        return datadict
         

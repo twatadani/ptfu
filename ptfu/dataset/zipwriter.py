@@ -6,7 +6,7 @@ import os
 import os.path
 from io import BytesIO
 from zipfile import ZipFile
-import numpy as np
+import pickle
 
 class ZipWriter(ArchiveWriter):
     ''' 生のディレクトリ内にファイルを格納するWriter '''
@@ -26,11 +26,11 @@ class ZipWriter(ArchiveWriter):
         self.fp = ZipFile(self.dstpath, mode='w')
         return
 
-    def _write_func(self, name, ndarray):
+    def _write_func(self, name, datadict):
         ''' ソースがオープンされていることを前提にname, ndarrayで
         与えられる1件のデータを書き込む '''
         bytesio = BytesIO()
-        np.save(bytesio, ndarray, allow_pickle=False)
-        self.fp.writestr(name + '.npy', bytesio.getbuffer())
+        pickle.dump(datadict, bytesio)
+        self.fp.writestr(name + '.pkl', bytesio.getbuffer())
         bytesio.close()
         return

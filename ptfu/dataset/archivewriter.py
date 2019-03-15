@@ -39,36 +39,52 @@ class ArchiveWriter:
         self.fp = None
         return
 
-    def _write_func(self, name, ndarray):
-        ''' ソースがオープンされていることを前提にname, ndarrayで
-        与えられる1件のデータを書き込む '''
+    def _write_func(self, name, datadict):
+        ''' ソースがオープンされていることを前提にdatadictで
+        与えられる1件のデータを書き込む'''
         raise NotImplementedError
 
-    def write(self, name, ndarray):
-        ''' nameとndarrayを指定して1件のデータを書き込む '''
+    def write(self, datadict, name=None):
+        ''' datadictを指定して1件のデータを書き込む nameはdatadict内にあれば指定する必要はない'''
         self._open_dst()
-        self._write_func(name, ndarray)
+        if name is not None:
+            self._write_func(name, datadict)
+        elif 'name' in datadict:
+            self._write_func(datadict['name'], datadict)
+        else:
+            self._close_dst()
+            raise ValueError('name is not found neither in name param or datadict')
         self._close_dst()
         return
 
     def writebylist(self, collection_of_data):
         ''' collectionを与えて複数のデータを書き込む
-        collection_of_dataの要素は(name, ndarray)のタプル '''
+        collection_of_dataの要素は(name, datadict)のタプル
+        datadict内に'name'キーがある場合はdatadict単独でも可 '''
         self._open_dst()
         for data in collection_of_data:
-            self._write_func(data[0], data[1])
+            if isinstance(data, list) or isinstance(data, tuple):
+                self._write_func(data[0], data[1])
+            elif isinstance(data, dict):
+                self._write_func(data['name'], data)
         self._close_dst()
         return
     
     def writebyq(self, queue):
         ''' queueを与えて複数のデータを書き込む
-        queueからpopされるデータは(name, ndarray)のタプル '''
+        queueからpopされるデータは(name, datadict)のタプル
+        datadict内に'name'キーがある場合はdatadict単独でも可 '''
         try:
             with self:
                 while queue.hasnext():
                     data = queue.pop()
                     if data is not None:
-                        self._write_func(data[0], data[1])
+                        if isinstance(data, list) or isinstance(data, tuple):
+                            self._write_func(data[0], data[1])
+                        elif isinstance(data, dict):
+                            self._write_func(data['name'], data)
+                        else:
+                            raise ValueError('writebyq: data must be tuple, list or dict')
                 return
         except:
             import traceback

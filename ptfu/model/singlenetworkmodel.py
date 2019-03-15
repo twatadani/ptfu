@@ -24,6 +24,11 @@ class SingleNetworkModel(Model):
         ''' パラメータを与えてネットワーク定義を行う
         tfconfig: TFConfigオブジェクト
         minibatchsize_per_tower: ミニバッチサイズ。タワー型並列実行については1タワーあたりの数 '''
+        self._define_network_common(tfconfig, minibatchsize_per_tower)
+        return
+
+    def _define_network_common(self, tfconfig, minibatchsize_per_tower):
+        ''' define_networkの共通部分 子クラスはこれに独自処理を加える '''
         import tensorflow as tf
         from ..kernel import kernel
 
@@ -65,6 +70,11 @@ class SingleNetworkModel(Model):
         tfconfig: TFConfigオブジェクト
         tf_loss_func: TensorFlowの損失関数
         **tf_loss_func_options: tf_loss_funcに与えるオプション '''
+        self._prepare_train_common(self, tfconfig, tf_loss_func, **tf_loss_func_options)
+        return
+        
+    def _prepare_train_common(self, tfconfig, tf_loss_func, **tf_loss_func_options):
+        ''' prepare_trainの共通実装。子クラスではこれにさらに独自処理を加える '''
         # 損失関数の定義
         import tensorflow.summary as summary
         import tensorflow as tf
@@ -163,25 +173,32 @@ class SingleNetworkModel(Model):
         # Sessionを立ち上げて学習を行う
         with SmartSession(tfconfig,
                           session_initialization_ops = init_ops,
-                          initialization_feed_dict = init_fd) as session:
+                          initialization_feed_dict = init_fd) as self.session:
             
             # ループ中のhookを設定
             if 'hooks' in options:
-                session.registerHooks(options['hooks'])
+                self.session.registerHooks(options['hooks'])
+            if len(self.trainhooks) > 0:
+                self.session.registerHooks(self.trainhooks)
 
             # ループ終了条件の設定
-            endflag.setSmartSession(session)
+            endflag.setSmartSession(self.session)
 
             while not endflag.should_end():
                 if is_tfrecord:
-                    session.run(self.train_op)
+                    self.session.run(self.train_op)
                 else:
                     minibatch = dataset.obtain_random_minibatch(minibatchsize)
                     fd = self._create_fd(minibatch, fdmapper, True)
-                    session.run(self.train_op, feed_dict=fd)
+                    self.session.run(self.train_op, feed_dict=fd)
 
             # 終了条件を表示
             logger.log('学習終了 終了条件: ' + endflag.reason())
+
+            # ミニバッチキューイングを止める
+            if not is_tfrecord:
+                dataset.stop_random_minibatch_queue()
+            
 
         self.training.put(True)
         return
@@ -220,9 +237,9 @@ class SingleNetworkModel(Model):
             assert isinstance(validationhook, ValidationHook), 'validationhook must be an instance of ptfu.model.ValidationHook'
         
         # tfconfigの設定を強制的に修正
-        if tfconfig.use_summary:
-            logger.warning('tfconfig.use_summaryがTrueですが、validation modeのためFalseに修正します。')
-            tfconfig.use_summary = False
+        #if tfconfig.use_summary:
+            #logger.warning('tfconfig.use_summaryがTrueですが、validation modeのためFalseに修正します。')
+            #tfconfig.use_summary = False
         if tfconfig.use_checkpoint:
             logger.warning('tfconfig.use_checkpointがTrueですが、validation modeのためFalseに修正します。')
             tfconfig.use_checkpoint = False
@@ -254,11 +271,15 @@ class SingleNetworkModel(Model):
                     evaluating_tensors.extend(hook.tensorlist)
                     evaluating_tensors = list(set(evaluating_tensors)) # 重複を削除
 
+            # validation opがあるならば
+            if hasattr(self, 'validation_op') and self.validation_op is not None:
+                evaluating_tensors.append(self.validation_op)
+
             # 最新のCheckpointを復元する
             try:
                 saver = tf.train.Saver()
                 saver.restore(session.session, save_path=latest_checkpoint)
-                logger.log('チェックポイントの復元に成功しました。')
+                logger.log('validation用チェックポイントの復元に成功しました。')
             except:
                 logger.warning('チェックポイントの復元に失敗しました。終了します。')
                 return
@@ -274,11 +295,16 @@ class SingleNetworkModel(Model):
                 except tf.errors.OutOfRangeError:
                     pass
             else:
+                #logger.debug('non-tfrecordに分岐しました。')
                 minibatchq = dataset.obtain_serial_minibatch_queue(minibatchsize)
+                #logger.debug('serial minibatch queueを作成しました')
                 while minibatchq.hasnext():
                     minibatch = minibatchq.pop()
+                    #logger.debug('ミニバッチデータをpopしました。')
                     fd = self._create_fd(minibatch, fdmapper, False)
                     results = session.run(evaluating_tensors, feed_dict=fd, run_hooks=True)
+                    #logger.debug('1ミニバッチ分のrunを施行しました。')
+                #logger.debug('while loopを終了しました。')
         return
 
 

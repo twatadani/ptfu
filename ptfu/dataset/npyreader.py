@@ -11,6 +11,9 @@ class NPYReader(TypeReader):
         super(NPYReader, self).__init__(DataType.NPY)
 
     def read(self, path):
-        ''' ファイルパスまたはBytesIOオブジェクトから読み込む '''
-        return np.load(path)
+        ''' ファイルパスまたはBytesIOオブジェクトから読み込み、datadictを返す '''
+        datadict = {}
+        ndarray = np.load(path)
+        datadict['data'] = ndarray
+        return datadict
 

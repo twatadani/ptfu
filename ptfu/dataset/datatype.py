@@ -10,6 +10,7 @@ class DataType(Enum):
     JPG = auto()
     DICOM = auto()
     NPY = auto() # .npy形式のndarray
+    PKL = auto() # pickle
     CIFAR10 = auto() # CIFAR10 data
     OTHER = auto() # その他
 
@@ -25,10 +26,12 @@ from .jpgreader import JPGReader
 from .pngreader import PNGReader
 from .dicomreader import DICOMReader
 from .npyreader import NPYReader
+from .pklreader import PKLReader
 from .cifar10datareader import Cifar10DataReader
 
 DataType.PNG.reader = PNGReader
 DataType.JPG.reader = JPGReader
 DataType.DICOM.reader = DICOMReader
 DataType.NPY.reader = NPYReader
+DataType.PKL.reader = PKLReader
 DataType.CIFAR10.reader = Cifar10DataReader

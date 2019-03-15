@@ -2,7 +2,7 @@
 
 from tempfile import TemporaryDirectory
 import os.path
-import numpy as np
+import pickle
 
 from glob import glob
 
@@ -35,12 +35,14 @@ class DiskCache:
         ''' nameに相当するキャッシュを読み込む。見つからない場合はNoneを返す '''
         fullpath = os.path.join(self.tmpdir.name, name)
         if os.path.exists(fullpath):
-            return np.load(fullpath)
+            with open(fullpath, mode='rb') as f:
+                return pickle.load(f)
         else:
             return None
 
-    def write(self, name, ndarray):
-        ''' name, datatypeに相当するndarrayデータをキャッシュに書き込む '''
+    def write(self, name, datadict):
+        ''' name, datadictに相当するデータをキャッシュに書き込む '''
         fullpath = os.path.join(self.tmpdir, name)
-        np.save(fullpath, ndarray, allow_pickle=False)
+        with open(fullpath, mode='wb') as f:
+            pickle.dump(datadict, fullpath)
         return

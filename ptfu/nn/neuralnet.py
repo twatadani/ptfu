@@ -57,6 +57,9 @@ class NeuralNet:
         self.outputs[name] = tensor
         return
 
+    def get_training_tensor(self):
+        return self.training_tensor
+
 class LayerBasedNeuralNet(NeuralNet):
     ''' レイヤー構造から構成されるNeuralNet: NeuralNetクラスを継承する '''
         

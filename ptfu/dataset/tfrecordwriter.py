@@ -6,19 +6,27 @@ import os
 import os.path
 
 import tensorflow as tf
+import numpy as np
+
+# class内に入れるとpickle化できないため、トップレベルにおく
+def default_feature_func(name, datadict):
+    ''' name, ndarrayからデフォルトのfeaturesを作成する関数 '''
+    feature = {}
+    for key in datadict:
+        value = datadict[key]
+        if isinstance(value, str):
+            feature[key] = TFRecordWriter.create_feature(value.encode)
+        elif isinstance(value, np.ndarray):
+            feature[key] = TFRecordWriter.create_feature(value.tobytes)
+        else:
+            raise ValueError('default_feature_func cannot process data: type(data) is', type(value))
+            
+    features = tf.train.Features(feature = feature)
+    return features
 
 class TFRecordWriter(ArchiveWriter):
     ''' TFRecord形式のデータセット格納を行うWriter '''
 
-    @staticmethod
-    def default_feature_func(name, ndarray):
-        ''' name, ndarrayからデフォルトのfeaturesを作成する関数 '''
-        features = tf.train.Features(
-            feature = {
-                'name': TFRecordWriter.create_feature(name.encode),
-                'data': TFRecordWriter.create_feature(ndarray.tobytes)
-            })
-        return features
         
     def __init__(self, dstpath, featurefunc=default_feature_func):
         ''' TFRecordWriterのイニシャライザ
@@ -54,9 +62,9 @@ class TFRecordWriter(ArchiveWriter):
             self.writer = None
         return
 
-    def _write_func(self, name, ndarray):
-        ''' ソースがオープンされていることを前提にname, ndarrayで与えられる1件のデータを書き込む '''
-        features = self.featurefunc(name, ndarray)
+    def _write_func(self, name, datadict):
+        ''' ソースがオープンされていることを前提にname, datadictで与えられる1件のデータを書き込む '''
+        features = self.featurefunc(name, datadict)
         example = tf.train.Example(features=features)
         self.writer.write(example.SerializeToString())
         return

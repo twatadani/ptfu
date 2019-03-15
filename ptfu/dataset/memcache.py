@@ -8,7 +8,7 @@ class MemCache:
     ''' メモリキャッシュを表すクラス
     内部にはcachedictがあり、
     key; name
-    value; numpy ndarray
+    value; datadict
     の形で格納される '''
 
     def __init__(self): #, maximum_size=None
@@ -33,7 +33,7 @@ class MemCache:
         else:
             return None
 
-    def write(self, name, ndarray):
-        ''' name, datatypeに相当するndarrayデータをキャッシュに書き込む '''
-        self.cachedict[name] = ndarray
+    def write(self, name, datadict):
+        ''' name, datadictに相当するdatadictyデータをキャッシュに書き込む '''
+        self.cachedict[name] = datadict
         return

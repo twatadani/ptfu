@@ -6,17 +6,23 @@ import tensorflow as tf
 class TFRecordDataSet(DataSet):
     ''' TFRecord形式のデータセット '''
 
-    def __init__(self, srclist, labellist, **options):
+    def __init__(self, srclist, labellist, validationsrclist=None, **options):
         ''' TFRecordDataSetのイニシャライザ
+        validationsrclist: Classifierなどin_train_validationを行う場合のvalidation tfrecordファイルのリスト
         optionsの与え方
         minibatchsize: 必須オプション。学習・検証のミニバッチサイズを与える
-        tensorshape: 必須ではないが推奨。辞書型でTFRecord内のラベルがキー、tensorのshapeが値。但しミニバッチ次元は削減した形で与える。たとえば(-1, 32, 32, 3)で動かすネットワークでは(32, 32, 3)を与える。 '''
+        tensorshape: 必須ではないが推奨。辞書型でTFRecord内のラベルがキー、tensorのshapeが値。但しミニバッチ次元は削減した形で与える。たとえば(-1, 32, 32, 3)で動かすネットワークでは(32, 32, 3)を与える。
+        label_dtype: 辞書形式。{ 'label1': tf.dtype, ...}で指定する。 '''
         from .dataset import LabelStyle
-        super(TFRecordDataSet, self).__init__(srclist, labellist, LabelStyle.TFRECORD, **options)
+        super(TFRecordDataSet, self).__init__(srclist, labellist, LabelStyle.TFRECORD,
+                                              None, # datatypeはNone
+                                              **options)
         
         # TFRecordDataSetではminibatchsizeを予め与えておく必要がある
         assert 'minibatchsize' in options, 'TFRecordDataSetの初期化にはminibatchsizeが必要です'
         self.minibatchsize = options['minibatchsize']
+
+        self.validationsrclist = validationsrclist
 
         # データセット内のtensor shapeを持つ
         if 'tensorshape' in options:
@@ -45,6 +51,26 @@ class TFRecordDataSet(DataSet):
         self._prepare_train_iterator(self.minibatchsize)
         return
 
+    def datanumber(self):
+        ''' このデータセット内のデータ数を得る '''
+        return self._datanumber_common(self.srclist)
+
+    def validation_datanumber(self):
+        ''' 検証用データセット内のデータ数を得る '''
+        return self._datanumber_common(self.validationsrclist)
+
+    @staticmethod
+    def _datanumber_common(srclist):
+        ''' srclistで指定されたTFRecord datasetのデータ数を得る '''
+        import tensorflow as tf
+        options = tf.python_io.TFRecordOptions(
+            compression_type = tf.python_io.TFRecordCompressionType.GZIP)
+        number = 0
+        for src in srclist:
+            iterator = tf.python_io.tf_record_iterator(src, options=options)
+            number += len(list(iterator))
+        return number
+
     def obtain_minibatch(self, minibatchsize):
         ''' ミニバッチデータを取得する。TFRecordDataSetの場合は、実際にはミニバッチデータを取得するオペレーションを定義する '''
         from ..kernel import kernel
@@ -62,22 +88,27 @@ class TFRecordDataSet(DataSet):
         for l in self.labellist:
             featuredict[l] = tf.FixedLenFeature([], dtype=tf.string)
 
-        print(featuredict)
+        #print(featuredict)
         features = tf.parse_single_example(example,features = featuredict)
-        print(features)
-        parsedlist = []
+        #print(features)
+        parseddict = {}
         for l in self.labellist:
             value = features[l]
             dtype = self.label_dtype[l] if self.label_dtype is not None else tf.float32
             if dtype in (tf.float16, tf.float32, tf.float64, tf.int32, tf.uint16, tf.uint8, tf.int16, tf.int8, tf.int64): # これらの型しか許されない
-                print(l)
+                #print(l)
                 decoded = tf.io.decode_raw(value, out_type = dtype)
                 if self.tensorshape is None:
-                    parsedlist.append(decoded)
+                    parseddict[l] = decoded
+                    #parsedlist.append(decoded)
+                elif l in self.tensorshape:
+                    parseddict[l] = tf.reshape(tensor = decoded,
+                                               shape = self.tensorshape[l])
+                    #parsedlist.append(tf.reshape(tensor = decoded,
+                    #                             shape = self.tensorshape[l]))
                 else:
-                    parsedlist.append(tf.reshape(tensor = decoded,
-                                                 shape = self.tensorshape[l]))
-        return parsedlist
+                    parseddict[l] = decoded
+        return parseddict
 
     def _prepare_train_iterator(self, minibatchsize):
         ''' 学習時用のminibatch iteratorを準備する '''

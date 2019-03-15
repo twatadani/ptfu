@@ -6,7 +6,7 @@ import os
 import os.path
 from io import BytesIO
 from tarfile import TarFile, TarInfo
-import numpy as np
+import pickle
 
 class TarWriter(ArchiveWriter):
     ''' Tarアーカイブ内にファイルを格納するWriter '''
@@ -21,19 +21,18 @@ class TarWriter(ArchiveWriter):
 
     def _open_dst(self):
         ''' アーカイブファイルをオープンし、self.fpを設定する。 '''
-        print('TarWriter _open_dstが呼び出されました。')
         parent_dir = os.path.dirname(self.dstpath)
         if not os.path.exists(parent_dir):
             os.makedirs(parent_dir, exist_ok=True)
         self.fp = TarFile.open(name=self.dstpath, mode='w:gz')
         return
 
-    def _write_func(self, name, ndarray):
-        ''' ソースがオープンされていることを前提にname, ndarrayで
+    def _write_func(self, name, datadict):
+        ''' ソースがオープンされていることを前提にname, datadictで
         与えられる1件のデータを書き込む '''
         bytesio = BytesIO()
-        np.save(bytesio, ndarray, allow_pickle=False)
-        info = TarInfo(name=name + '.npy')
+        pickle.dump(datadict, bytesio)
+        info = TarInfo(name=name + '.pkl')
         info.size = len(bytesio.getbuffer())
         bytesio.seek(0)
         self.fp.addfile(info, fileobj=bytesio)
