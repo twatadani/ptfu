@@ -4,5 +4,6 @@ from .singlenetworkmodel import SingleNetworkModel
 from .classifier import Classifier
 from .endflag import EndFlag, MaxGlobalStepFlag, LossNaNEndFlag, TensorSmallerEndFlag
 from .validationhook import ValidationHook
+from .grad_cam import GradCam
 
 name='ptfu.model'

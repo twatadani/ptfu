@@ -108,27 +108,51 @@ class TFRecordDataSet(DataSet):
                     #                             shape = self.tensorshape[l]))
                 else:
                     parseddict[l] = decoded
+            elif dtype == tf.string:
+                #print('dtypeがtf.stringです label:', l)
+                #print('valueのtype:', type(value))
+                #print('valueのshape:', value.shape)
+                #decoded = tf.io.decode_raw(value, out_type = dtype)
+                #print('decodedのtype:', type(decoded))
+                parseddict[l] = value
         return parseddict
 
     def _prepare_train_iterator(self, minibatchsize):
         ''' 学習時用のminibatch iteratorを準備する '''
         from ..kernel import kernel
         dataset = tf.data.TFRecordDataset(self.srclist_ph, compression_type='GZIP')
-        dataset_shuffle_repeat = dataset.apply(
-                            tf.contrib.data.shuffle_and_repeat(buffer_size = minibatchsize * 10))
-        dataset_map_batch = dataset_shuffle_repeat.apply(tf.contrib.data.map_and_batch(
-            map_func = self._record_parse,
-            batch_size = minibatchsize,
-            num_parallel_calls = self.parallel))
+        if hasattr(tf.data.experimental, 'shuffle_and_repeat'):
+            dataset_shuffle_repeat = dataset.apply(
+                tf.data.experimental.shuffle_and_repeat(buffer_size = minibatchsize * 10))
+        else:
+            dataset_shuffle_repeat = dataset.apply(
+                tf.contrib.data.shuffle_and_repeat(buffer_size = minibatchsize * 10))
+        if hasattr(tf.data.experimental, 'map_and_batch'):
+            dataset_map_batch = dataset_shuffle_repeat.apply(
+                tf.data.experimental.map_and_batch(
+                    map_func = self._record_parse,
+                    batch_size = minibatchsize,
+                    num_parallel_calls = self.parallel))
+        else:
+            dataset_map_batch = dataset_shuffle_repeat.apply(tf.contrib.data.map_and_batch(
+                map_func = self._record_parse,
+                batch_size = minibatchsize,
+                num_parallel_calls = self.parallel))
         prefetch = dataset_map_batch.prefetch(buffer_size = minibatchsize)
         self.train_iterator = prefetch.make_initializable_iterator()
         self.train_initializer = self.train_iterator.initializer
 
         # validation用
-        validation_map_batch = dataset.apply(tf.contrib.data.map_and_batch(
-            map_func = self._record_parse,
-            batch_size = minibatchsize,
-            num_parallel_calls = self.parallel))
+        if hasattr(tf.data.experimental, 'map_and_batch'):
+            validation_map_batch = dataset.apply(tf.data.experimental.map_and_batch(
+                map_func = self._record_parse,
+                batch_size = minibatchsize,
+                num_parallel_calls = self.parallel))
+        else:
+            validation_map_batch = dataset.apply(tf.contrib.data.map_and_batch(
+                map_func = self._record_parse,
+                batch_size = minibatchsize,
+                num_parallel_calls = self.parallel))
         validation_prefetch = validation_map_batch.prefetch(buffer_size = minibatchsize)
         self.validation_iterator = validation_prefetch.make_initializable_iterator()
         self.validation_initializer = self.validation_iterator.initializer

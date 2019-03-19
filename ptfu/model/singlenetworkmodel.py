@@ -289,11 +289,13 @@ class SingleNetworkModel(Model):
             if is_tfrecord:
                 try:
                     # ロードしてからinitしないと、復元の時点でinitしていないことになる
-                    session.run(init_ops, feed_dict=init_fd, run_hooks=False)
+                    session.session.run(init_ops, feed_dict=init_fd)
                     while True:
                         results = session.run(evaluating_tensors, run_hooks=True)
                 except tf.errors.OutOfRangeError:
                     pass
+                except tf.python.framework.errors_impl.OutOfRangeError:
+                    print('tf.python.framework.erros_impl.OutOfRangeErrorを捕捉しました')
             else:
                 #logger.debug('non-tfrecordに分岐しました。')
                 minibatchq = dataset.obtain_serial_minibatch_queue(minibatchsize)

@@ -67,7 +67,7 @@ def random_split_index(minibatchsize, nsplit):
     import random
     generated = []
     residue = minibatchsize
-    for i in range(nsplit-1):
+    for _ in range(nsplit-1):
         ranint = random.randint(0, residue)
         generated.append(ranint)
         residue -= ranint
@@ -76,6 +76,24 @@ def random_split_index(minibatchsize, nsplit):
     generated.append(last)
     random.shuffle(generated)
     return generated
+
+def create_colormap(ndarray):
+    ''' サーモグラフィー風のカラーマップを作成する
+    与えるndarrayは(x, y)形式で、チャネル成分は持たないことが前提 '''
+    import numpy as np
+    # 0-1にremapする
+    normalized = ndarray / (max(0, np.max(ndarray)) + 1e-7)
+
+    channelshape = (normalized.shape[0], normalized.shape[1], 1)
+    r = np.reshape(np.sin(np.maximum(normalized - 0.5, 0) * np.pi),
+                    channelshape)
+    g = np.reshape(np.sin(normalized * np.pi),
+                    channelshape)
+    b = np.reshape(1.0 + np.cos(np.minimum(normalized + 0.5, 1) * np.pi),
+                    channelshape)
+    rgb = np.concatenate([r, g, b], axis=-1)
+    rgbuint8 = np.uint8(rgb * 255)
+    return rgbuint8
 
 
 
