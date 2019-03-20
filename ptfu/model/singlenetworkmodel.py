@@ -184,6 +184,9 @@ class SingleNetworkModel(Model):
             # ループ終了条件の設定
             endflag.setSmartSession(self.session)
 
+            # initial hookを実行する
+            self.session.run_initial_or_final_hooks(True)
+
             while not endflag.should_end():
                 if is_tfrecord:
                     self.session.run(self.train_op)
@@ -194,6 +197,9 @@ class SingleNetworkModel(Model):
 
             # 終了条件を表示
             logger.log('学習終了 終了条件: ' + endflag.reason())
+
+            # final hookを実行する
+            self.session.run_initial_or_final_hooks(False)
 
             # ミニバッチキューイングを止める
             if not is_tfrecord:
@@ -293,9 +299,13 @@ class SingleNetworkModel(Model):
                     while True:
                         results = session.run(evaluating_tensors, run_hooks=True)
                 except tf.errors.OutOfRangeError:
-                    pass
+                    print('tf.errors.OutOfRangeErrorを捕捉しました')
                 except tf.python.framework.errors_impl.OutOfRangeError:
                     print('tf.python.framework.erros_impl.OutOfRangeErrorを捕捉しました')
+                except:
+                    print('validation loopでその他の例外を捕捉しました。')
+                    import traceback
+                    traceback.print_exc()
             else:
                 #logger.debug('non-tfrecordに分岐しました。')
                 minibatchq = dataset.obtain_serial_minibatch_queue(minibatchsize)

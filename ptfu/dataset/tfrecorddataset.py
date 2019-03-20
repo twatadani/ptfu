@@ -121,13 +121,13 @@ class TFRecordDataSet(DataSet):
         ''' 学習時用のminibatch iteratorを準備する '''
         from ..kernel import kernel
         dataset = tf.data.TFRecordDataset(self.srclist_ph, compression_type='GZIP')
-        if hasattr(tf.data.experimental, 'shuffle_and_repeat'):
+        if hasattr(tf.data, 'experimental') and hasattr(tf.data.experimental, 'shuffle_and_repeat'):
             dataset_shuffle_repeat = dataset.apply(
                 tf.data.experimental.shuffle_and_repeat(buffer_size = minibatchsize * 10))
         else:
             dataset_shuffle_repeat = dataset.apply(
                 tf.contrib.data.shuffle_and_repeat(buffer_size = minibatchsize * 10))
-        if hasattr(tf.data.experimental, 'map_and_batch'):
+        if hasattr(tf.data, 'experimental') and hasattr(tf.data.experimental, 'map_and_batch'):
             dataset_map_batch = dataset_shuffle_repeat.apply(
                 tf.data.experimental.map_and_batch(
                     map_func = self._record_parse,
@@ -143,7 +143,7 @@ class TFRecordDataSet(DataSet):
         self.train_initializer = self.train_iterator.initializer
 
         # validation用
-        if hasattr(tf.data.experimental, 'map_and_batch'):
+        if hasattr(tf.data, 'experimental') and hasattr(tf.data.experimental, 'map_and_batch'):
             validation_map_batch = dataset.apply(tf.data.experimental.map_and_batch(
                 map_func = self._record_parse,
                 batch_size = minibatchsize,

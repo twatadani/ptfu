@@ -140,8 +140,10 @@ class Classifier(SingleNetworkModel):
             with tf.device(metrics_device):
                 slice_start = tf.mod(step_tensor * minibatchsize, metrics_duration,
                                      name = prefix + 'metrics_slice_start')
-                slice_end = tf.add(slice_start, minibatchsize,
-                                   name = prefix + 'metrics_slice_end')
+                slice_end = tf.math.minimum(
+                    tf.to_int64(metrics_duration),
+                    tf.add(slice_start, minibatchsize),
+                    name = prefix + 'metrics_slice_end')
                 label_sliced = label_buffer[slice_start:slice_end]
                 prediction_sliced = prediction_buffer[slice_start:slice_end]
 
@@ -157,11 +159,11 @@ class Classifier(SingleNetworkModel):
                 else:
                     self.labels_validation_update_op = tf.assign(
                         ref = label_sliced,
-                        value = label_tensor,
+                        value = label_tensor[0:label_sliced.shape[0]], # minibatchが小さいときのため必要
                         name = 'labels_validation_update_op')
                     self.predictions_validation_update_op = tf.assign(
                         ref = prediction_sliced,
-                        value = prediction_tensor,
+                        value = prediction_tensor[0:prediction_sliced.shape[0]], # minibatchが小さいときのため必要
                         name = 'predictions_validation_update_op')
 
                 # classwise metricsの集計
