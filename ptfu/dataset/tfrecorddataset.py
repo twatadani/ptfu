@@ -12,6 +12,8 @@ class TFRecordDataSet(DataSet):
         optionsの与え方
         minibatchsize: 必須オプション。学習・検証のミニバッチサイズを与える
         tensorshape: 必須ではないが推奨。辞書型でTFRecord内のラベルがキー、tensorのshapeが値。但しミニバッチ次元は削減した形で与える。たとえば(-1, 32, 32, 3)で動かすネットワークでは(32, 32, 3)を与える。
+        augment_func_dict: data augmentationのための関数を格納した辞書。キーにtensorのラベル文字列、valueに関数を与える。例えば、 { 'data': func1, ... }
+        個々の関数については、 def func1(tensor)でreturn valueもtensorとなるようにする
         label_dtype: 辞書形式。{ 'label1': tf.dtype, ...}で指定する。 '''
         from .dataset import LabelStyle
         super(TFRecordDataSet, self).__init__(srclist, labellist, LabelStyle.TFRECORD,
@@ -41,6 +43,12 @@ class TFRecordDataSet(DataSet):
         else:
             print('label_dtype NOT found')
             self.label_dtype = None
+
+        if 'augment_func_dict' in options:
+            assert isinstance(options['augment_func_dict'], dict)
+            self.augment_func_dict = options['augment_func_dict']
+        else:
+            self.augment_func_dict = {}
 
         if 'parallel' in options:
             self.parallel = options['parallel']
@@ -84,36 +92,36 @@ class TFRecordDataSet(DataSet):
 
     def _record_parse(self, example):
         ''' 内部的に使用するTFRecordのパース用関数 '''
-        featuredict = {}
-        for l in self.labellist:
-            featuredict[l] = tf.FixedLenFeature([], dtype=tf.string)
+        from ..kernel import kernel
+        featuredict = { l: tf.FixedLenFeature([], dtype=tf.string) for l in self.labellist }
+        #featuredict = {}
+        #for l in self.labellist:
+            #featuredict[l] = tf.FixedLenFeature([], dtype=tf.string)
 
-        #print(featuredict)
         features = tf.parse_single_example(example,features = featuredict)
-        #print(features)
+        training_tensor = kernel.get_training_tensor()
         parseddict = {}
         for l in self.labellist:
             value = features[l]
             dtype = self.label_dtype[l] if self.label_dtype is not None else tf.float32
             if dtype in (tf.float16, tf.float32, tf.float64, tf.int32, tf.uint16, tf.uint8, tf.int16, tf.int8, tf.int64): # これらの型しか許されない
-                #print(l)
                 decoded = tf.io.decode_raw(value, out_type = dtype)
                 if self.tensorshape is None:
                     parseddict[l] = decoded
-                    #parsedlist.append(decoded)
                 elif l in self.tensorshape:
-                    parseddict[l] = tf.reshape(tensor = decoded,
-                                               shape = self.tensorshape[l])
-                    #parsedlist.append(tf.reshape(tensor = decoded,
-                    #                             shape = self.tensorshape[l]))
+                    reshaped = tf.reshape(tensor = decoded, shape = self.tensorshape[l])
+                    # augmentationを行う場合
+                    if l in self.augment_func_dict:
+                        parseddict[l] = tf.cond(
+                            training_tensor, # prediction
+                            lambda: self.augment_func_dict[l](reshaped), # true func
+                            lambda: reshaped) # false func
+                    # augmentationなしの場合
+                    else:
+                        parseddict[l] = reshaped
                 else:
                     parseddict[l] = decoded
             elif dtype == tf.string:
-                #print('dtypeがtf.stringです label:', l)
-                #print('valueのtype:', type(value))
-                #print('valueのshape:', value.shape)
-                #decoded = tf.io.decode_raw(value, out_type = dtype)
-                #print('decodedのtype:', type(decoded))
                 parseddict[l] = value
         return parseddict
 

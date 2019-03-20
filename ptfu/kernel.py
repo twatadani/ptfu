@@ -9,6 +9,7 @@ class Kernel:
         from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
         from multiprocessing import Manager
         from .functions import cpu_count
+        import random
         ncpu = max(cpu_count() - 1, 1)
         self.texecutor = ThreadPoolExecutor(max_workers=ncpu)
         self.pexecutor = ProcessPoolExecutor(max_workers=ncpu)
@@ -17,6 +18,11 @@ class Kernel:
                                            dtype=tf.bool,
                                            trainable=False,
                                            name='training')
+        random.seed()
+        if hasattr(tf, 'random'):
+            tf.random.set_random_seed(random.randint(-10000000, 10000000))
+        else:
+            tf.set_random_seed(random.randint(-10000000, 10000000))
         return
 
     def __del__(self):

@@ -54,9 +54,9 @@ class SmartSession:
         self.endflag_tensor_set = set()
 
         # セッション初期化に必要なop
-        self.initialization_ops = [
-            tf.global_variables_initializer(),
-            tf.local_variables_initializer() ]
+        self.initialization_ops = []
+        #tf.global_variables_initializer(),
+        #tf.local_variables_initializer() ]
         self.initialization_fd = None
 
         if session_initialization_ops is not None:
@@ -90,8 +90,11 @@ class SmartSession:
             lastchkp = tf.train.latest_checkpoint(self.tfconfig.summarydir)
 
             # restore前に一旦初期化する
-            self.session.run(self.initialization_ops,
-                             feed_dict=self.initialization_fd)
+            self.session.run([tf.global_variables_initializer(),
+                              tf.local_variables_initializer()])
+            if len(self.initialization_ops) > 0:
+                self.session.run(self.initialization_ops,
+                                 feed_dict=self.initialization_fd)
 
             try:
                 if lastchkp is not None:
