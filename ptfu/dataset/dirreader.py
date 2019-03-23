@@ -19,8 +19,8 @@ class DirReader(ArchiveReader):
         globstr_base = os.path.join(self.srcpath, glob_elem)
         globstr_large = globstr_base + datatype.getext().upper()
         globstr_small = globstr_base + datatype.getext()
-        result_large = glob.glob(globstr_large)
-        result_small = glob.glob(globstr_small)
+        result_large = glob.glob(globstr_large, recursive=True)
+        result_small = glob.glob(globstr_small, recursive=True)
         result = result_large
         result.extend(result_small)
         return set(result)
@@ -34,7 +34,7 @@ class DirReader(ArchiveReader):
         if not os.path.exists(path):
             import os, glob
             globstr = os.path.join(fp, '**' + os.sep + name)
-            path = glob.glob(globstr)[0]
+            path = glob.glob(globstr, recursive=True)[0]
         if os.path.exists(path):
             return path
         else:

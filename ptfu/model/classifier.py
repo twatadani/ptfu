@@ -138,12 +138,19 @@ class Classifier(SingleNetworkModel):
 
         with tf.name_scope('classifier_metrics'):
             with tf.device(metrics_device):
-                slice_start = tf.mod(step_tensor * minibatchsize, metrics_duration,
-                                     name = prefix + 'metrics_slice_start')
+                slice_start = tf.to_int32(tf.mod(step_tensor * minibatchsize, metrics_duration,
+                                                 name = prefix + 'metrics_slice_start'))
+                assert slice_start.dtype == tf.int32, slice_start.dtype
+                actual_batchsize = tf.math.minimum(
+                    tf.to_int32(minibatchsize),
+                    tf.to_int32(tf.shape(label_tensor)[0]),
+                    name = 'actual_batchsize')
+                assert actual_batchsize.dtype == tf.int32, actual_batchsize.dtype
                 slice_end = tf.math.minimum(
-                    tf.to_int64(metrics_duration),
-                    tf.add(slice_start, minibatchsize),
+                    tf.to_int32(metrics_duration),
+                    tf.add(slice_start, actual_batchsize),
                     name = prefix + 'metrics_slice_end')
+                assert slice_end.dtype == tf.int32, slice_end.dtype
                 label_sliced = label_buffer[slice_start:slice_end]
                 prediction_sliced = prediction_buffer[slice_start:slice_end]
 

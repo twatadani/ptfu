@@ -16,7 +16,7 @@ class DICOMReader(TypeReader):
 
     def read(self, bytesio_or_file):
         ''' BytesIOまたはファイルパスを与え、datadictの形式で読み出す。'''
-        ndarray =  DICOMReader.dcm2npy(pydicom.dcmread(bytesio))
+        ndarray =  DICOMReader.dcm2npy(pydicom.dcmread(bytesio_or_file))
         datadict = {}
         datadict['data'] = ndarray
         return datadict

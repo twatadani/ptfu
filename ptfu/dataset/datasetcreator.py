@@ -273,9 +273,17 @@ class DatasetCreator:
         total = 0
         for _ in range(ngroups):
             newn = n_per_group
+            # totalがデータ数を超えないようにする安全策
             if total + newn > ndata:
                 newn = ndata - total
             nlist.append(newn)
+            total += newn
+
+        # データを拾いこぼさないようにする安全策
+        if total < ndata:
+            residue = ndata - total
+            for i in range(residue):
+                nlist[i] += 1
         
         executor = ptfu.kernel.pexecutor
         futures = []

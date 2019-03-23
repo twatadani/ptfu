@@ -10,7 +10,7 @@ import numpy as np
 
 # class内に入れるとpickle化できないため、トップレベルにおく
 def default_feature_func(name, datadict):
-    ''' name, ndarrayからデフォルトのfeaturesを作成する関数 '''
+    ''' name, datadictからデフォルトのfeaturesを作成する関数 '''
     feature = {}
     for key in datadict:
         value = datadict[key]
