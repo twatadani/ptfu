@@ -7,15 +7,13 @@ import tensorflow as tf
 class Classifier(SingleNetworkModel):
     ''' 分類タスクを行う単一ネットワークモデル '''
 
-    def __init__(self, neural_network, optimizer, label_tensor_key, prediction_tensor_key, classlist, metrics_duration=1000):
+    def __init__(self, neural_network, optimizer, label_tensor_key, prediction_tensor_key, classlist, metrics_duration=1000, in_train_validation_interval=1000):
         '''
         label_tensor_key: nn.get_input_tensors[label_tensor_key]でlabel tensorが取得できるようなキー
         prediction_tensor_key: nn.get_output_tensor[prediction_tensor_key]でprediction tensorが取得できるようなキー
-        classlist: 分類するクラスのリスト
-        例えば['car', 'signal', 'cat', 'dog'] 
-        metrics_duration: accracyなどを何件分で計算するか
-
-'''
+        classlist: ['car', 'signal', 'cat', 'dog'] 
+        metrics_duration: accracy
+        in_train_validation_interval: in train validation '''
         super(Classifier, self).__init__(neural_network, optimizer)
         self.label_tensor_key = label_tensor_key
         self.prediction_tensor_key = prediction_tensor_key
@@ -23,11 +21,11 @@ class Classifier(SingleNetworkModel):
         self.nclasses = len(classlist) # 分類するクラスの数
         self.metrics_duration = metrics_duration
         self.in_train_validation_initialized = False # in_train_validationの初期化
+        self.in_train_validation_interval = in_train_validation_interval
         return
 
     def define_network(self, tfconfig, minibatchsize_per_tower, validation_datasize):
         ''' パラメータを与えてネットワークを定義する '''
-        import numpy as np
         from ..tfconfig import TFConfig
 
         self._define_network_common(tfconfig, minibatchsize_per_tower)
@@ -42,7 +40,8 @@ class Classifier(SingleNetworkModel):
             if tfconfig.use_xla:
                 metric_device = TFConfig.XLA_GPU
             else:
-                metric_device = tfconfig.gpu_list[-1]
+                #metric_device = tfconfig.gpu_list[-1]
+                metric_device = tfconfig.towers[0][-1]
         else:
             if tfconfig.use_xla:
                 metric_device = TFConfig.XLA_CPU
@@ -53,6 +52,8 @@ class Classifier(SingleNetworkModel):
         label_tensor = tf.to_int64(self.nn.get_input_tensors()[self.label_tensor_key])
         prediction_tensor = self.nn.get_output_tensors()[self.prediction_tensor_key]
 
+        #assert False, metric_device
+        
         with tf.name_scope('classifier_metrics'):
             with tf.device(metric_device):
                 prediction_hot = tf.argmax(prediction_tensor,
@@ -166,11 +167,11 @@ class Classifier(SingleNetworkModel):
                 else:
                     self.labels_validation_update_op = tf.assign(
                         ref = label_sliced,
-                        value = label_tensor[0:label_sliced.shape[0]], # minibatchが小さいときのため必要
+                        value = label_tensor[0:tf.shape(label_sliced)[0]], # minibatchが小さいときのため必要
                         name = 'labels_validation_update_op')
                     self.predictions_validation_update_op = tf.assign(
                         ref = prediction_sliced,
-                        value = prediction_tensor[0:prediction_sliced.shape[0]], # minibatchが小さいときのため必要
+                        value = prediction_tensor[0:tf.shape(prediction_sliced)[0]], # minibatchが小さいときのため必要
                         name = 'predictions_validation_update_op')
 
                 # classwise metricsの集計
@@ -320,6 +321,16 @@ class Classifier(SingleNetworkModel):
                     self.overall_accuracy = overall_accuracy
                 else:
                     self.validation_overall_accuracy = overall_accuracy
+                    self.validation_micro_precision = micro_precision
+                    self.validation_micro_recall = micro_recall
+                    self.validation_micro_fmeasures = micro_fmeasures
+
+                # debug metrics
+                if tfconfig.use_summary:
+                    fname = 'micro_metrics_debug'
+                    tf.summary.scalar(name='micro_tpsum', tensor=tpsum, family=fname)
+                    tf.summary.scalar(name='micro_fpsum', tensor=fpsum, family=fname)
+                    tf.summary.scalar(name='micro_fnsum', tensor=fnsum, family=fname)
 
                 # TensorBoardへの登録
                 if tfconfig.use_summary:
@@ -356,7 +367,7 @@ class Classifier(SingleNetworkModel):
             # in_train_validationのhook登録
             itvalidationhook = LoopSmartSessionHook(
                 hook_func = self.in_train_validation,
-                hook_step = 1000,
+                hook_step = self.in_train_validation_interval,
                 hook_mod = 0,
                 synchronous = True,
                 required_tensor_list = [],
@@ -409,7 +420,16 @@ class Classifier(SingleNetworkModel):
                 fd = self._create_fd(minibatch, fdmapper, False)
                 self.session.run(self.validation_op, feed_dict=fd, run_hooks=False)
 
+        # accuracyを取り出す
+        v_accuracy = self.session.session.run(self.validation_overall_accuracy)
+
         # 後片付け
         self.session.session.run(self.set_training_true_op)#, run_hooks=False)
-        logger.log('In train validationを終了します。')
+        if is_tfrecord:
+            # random minibatchをイニシャライズする
+            fd = {
+                validation_dataset.srclist_ph: list(validation_dataset.srclist)
+            }
+            self.session.session.run(validation_dataset.train_iterator_initializer(), feed_dict=fd)
+        logger.log('In train validationを終了します。validation overall accuracy = ' + str(v_accuracy))
         return

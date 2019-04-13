@@ -189,7 +189,12 @@ class SingleNetworkModel(Model):
 
             while not endflag.should_end():
                 if is_tfrecord:
-                    self.session.run(self.train_op)
+                    try:
+                        self.session.run(self.train_op)
+                    except tf.errors.OutOfRangeError:
+                        from time import sleep
+                        sleep(1)
+                        #logger.warning('tf.erros.OutOfRangeErrorを捕捉しましたが、継続します。')
                 else:
                     minibatch = dataset.obtain_random_minibatch(minibatchsize)
                     fd = self._create_fd(minibatch, fdmapper, True)
@@ -261,7 +266,7 @@ class SingleNetworkModel(Model):
         if is_tfrecord:
             init_ops = [dataset.validation_iterator_initializer(),
                         self.set_training_false_op ]
-            init_fd = { dataset.srclist_ph: list(dataset.srclist) }
+            init_fd = { dataset.srclist_ph: list(dataset.validationsrclist) }
         else:
             init_ops = None
             init_fd = None
@@ -299,9 +304,10 @@ class SingleNetworkModel(Model):
                     while True:
                         results = session.run(evaluating_tensors, run_hooks=True)
                 except tf.errors.OutOfRangeError:
-                    print('tf.errors.OutOfRangeErrorを捕捉しました')
-                except tf.python.framework.errors_impl.OutOfRangeError:
-                    print('tf.python.framework.erros_impl.OutOfRangeErrorを捕捉しました')
+                    pass
+                    #print('tf.errors.OutOfRangeErrorを捕捉しました')
+                #except tf.python.framework.errors_impl.OutOfRangeError:
+                    #print('tf.python.framework.erros_impl.OutOfRangeErrorを捕捉しました')
                 except:
                     print('validation loopでその他の例外を捕捉しました。')
                     import traceback

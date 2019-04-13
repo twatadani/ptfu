@@ -21,6 +21,8 @@ class TFConfig:
         summarydir: パス文字列 # summary, checkpointを保存するディレクトリ
         use_autoreload: True or False # 学習中断したときにcheckpointを読み込んで学習を再開するかどうか。デフォルトはTrue
         use_xla: XLA JITコンパイルを使用するかどうか
+        use_log_device_placement: デバイスへの配置ログを記録するかどうか
+        allow_soft_placement: GPU memoryが足りないときに他のGPUを使うかどうか
         '''
 
         # GPU関係の設定
@@ -75,6 +77,19 @@ class TFConfig:
         if 'use_xla' in kwargs:
             self.use_xla = kwargs['use_xla']
 
+        # log device placementを使用するかどうか
+        if 'use_log_device_placement' in kwargs:
+            self.use_log_device_placement = kwargs['use_log_device_placement']
+        else:
+            self.use_log_device_placement = False
+        
+        # soft placement
+        if 'allow_soft_placement' in kwargs:
+            self.allow_soft_placement = kwargs['allow_soft_placement']
+        else:
+            self.allow_soft_placement = False
+            
+            
         # 並列実行のtowerを構築する
         self.towers = self._create_towers()
 
@@ -83,13 +98,15 @@ class TFConfig:
     def create_configproto(self):
         ''' 設定情報からTensorFlowのConfigProtoを作成する '''
         import tensorflow as tf
+
         if self.use_gpu:
             gpu_options = tf.GPUOptions(
                 visible_device_list = self._list2strlist(self.gpu_list),
                 allow_growth = True) # メモリは最初から全確保でなく、必要に応じて確保する
             cp = tf.ConfigProto(
                 gpu_options = gpu_options,
-                allow_soft_placement = True)
+                allow_soft_placement = self.allow_soft_placement,
+                log_device_placement = self.use_log_device_placement)
             # XLA JITコンパイルを有効にする(GPUのみ)
             #if self.use_xla:
                 #cp.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
@@ -99,8 +116,8 @@ class TFConfig:
             import os
             os.environ['CUDA_VISIBLE_DEVICES'] = ''
             cp = tf.ConfigProto(
-                allow_soft_placement = True)
-
+                allow_soft_placement = True,
+                log_device_placement = self.use_log_device_placement)
         
         return cp
 
