@@ -198,10 +198,7 @@ class DataSet:
                     
                         # 次のリストに移行する
                         current_listindex += 1
-                        #logger.debug('次のリストに移行します。')
-                        #logger.debug('current_listindex: ' + str(current_listindex))
-                        #logger.debug('batch_counter: ' + str(batch_counter))
-                        #logger.debug('len(namelists): ' + str(len(namelists)))
+
                         if current_listindex < len(namelists): # 次のリストがまだある場合のみ
                             current_list = list(namelists[current_listindex])
                             batch_start = 0
@@ -234,7 +231,6 @@ class DataSet:
     def _randomq_worker(queue, minibatchsize, storetype, srclist, labellist, labelstyle, datatype, options, qsize_threashold = 50):
         ''' ランダムにミニバッチを取得し、キューに入れる作業を繰り返すワーカー関数 '''
         from time import sleep
-        #print('_randomq_workerが起動されました')
         try:
             areaders = []
             for src in srclist:
@@ -275,3 +271,6 @@ class DataSet:
             
             minibatchdata.extend(data)
         return minibatchdata
+
+name = 'dataset'
+

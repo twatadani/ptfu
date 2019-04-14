@@ -3,7 +3,7 @@
 from .smartsessionhook import SmartSessionHook
 
 class OneTimeSmartSessionHook(SmartSessionHook):
-    ''' 繰り返し実行されるSmartSessionHook '''
+    ''' 一度だけ実行されるSmartSessionHook '''
 
     def __init__(self, hook_func=None, hook_step=1, synchronous=True,
                  required_tensor_list=None, feed_dict=None, hook_name=None,
@@ -23,4 +23,4 @@ class OneTimeSmartSessionHook(SmartSessionHook):
         self.step = hook_step
         return
 
-name = 'loopsmartsessionhook'
+name = 'onetimesmartsessionhook'

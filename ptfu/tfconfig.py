@@ -163,9 +163,7 @@ class TFConfig:
                 ngpu_per_tower = len(self.gpu_list)
                 
                 tw_start = i * ngpu_per_tower
-                #print('tw_start = ', tw_start)
                 tw_end = tw_start + ngpu_per_tower
-                #print('tw_end = ', tw_end)
                 if i == self.ntowers() - 1:
                     tw_end = len(self.gpu_list)
 
@@ -174,4 +172,7 @@ class TFConfig:
                     tower.append(prefix + str(gpunum))
             towers.append(tower)
         return towers
+
+name = 'tfconfig'
+
         

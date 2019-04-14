@@ -34,8 +34,6 @@ def splitlist(orig_list, n):
         end = start + len_splitted
         if end >= length:
             end = length
-        #partial_list = orig_list[start:end]
-        #print('len_splitted=', len_splitted, ', len(partial_list)=', len(partial_list))
         splitted.append(orig_list[start:end])
     return splitted
 
@@ -94,6 +92,9 @@ def create_colormap(ndarray):
     rgb = np.concatenate([r, g, b], axis=-1)
     rgbuint8 = np.uint8(rgb * 255)
     return rgbuint8
+
+
+name = 'functions'
 
 
 

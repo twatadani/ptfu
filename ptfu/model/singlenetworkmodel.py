@@ -194,7 +194,6 @@ class SingleNetworkModel(Model):
                     except tf.errors.OutOfRangeError:
                         from time import sleep
                         sleep(1)
-                        #logger.warning('tf.erros.OutOfRangeErrorを捕捉しましたが、継続します。')
                 else:
                     minibatch = dataset.obtain_random_minibatch(minibatchsize)
                     fd = self._create_fd(minibatch, fdmapper, True)
@@ -248,9 +247,6 @@ class SingleNetworkModel(Model):
             assert isinstance(validationhook, ValidationHook), 'validationhook must be an instance of ptfu.model.ValidationHook'
         
         # tfconfigの設定を強制的に修正
-        #if tfconfig.use_summary:
-            #logger.warning('tfconfig.use_summaryがTrueですが、validation modeのためFalseに修正します。')
-            #tfconfig.use_summary = False
         if tfconfig.use_checkpoint:
             logger.warning('tfconfig.use_checkpointがTrueですが、validation modeのためFalseに修正します。')
             tfconfig.use_checkpoint = False
@@ -305,24 +301,16 @@ class SingleNetworkModel(Model):
                         results = session.run(evaluating_tensors, run_hooks=True)
                 except tf.errors.OutOfRangeError:
                     pass
-                    #print('tf.errors.OutOfRangeErrorを捕捉しました')
-                #except tf.python.framework.errors_impl.OutOfRangeError:
-                    #print('tf.python.framework.erros_impl.OutOfRangeErrorを捕捉しました')
                 except:
                     print('validation loopでその他の例外を捕捉しました。')
                     import traceback
                     traceback.print_exc()
             else:
-                #logger.debug('non-tfrecordに分岐しました。')
                 minibatchq = dataset.obtain_serial_minibatch_queue(minibatchsize)
-                #logger.debug('serial minibatch queueを作成しました')
                 while minibatchq.hasnext():
                     minibatch = minibatchq.pop()
-                    #logger.debug('ミニバッチデータをpopしました。')
                     fd = self._create_fd(minibatch, fdmapper, False)
                     results = session.run(evaluating_tensors, feed_dict=fd, run_hooks=True)
-                    #logger.debug('1ミニバッチ分のrunを施行しました。')
-                #logger.debug('while loopを終了しました。')
         return
 
 
@@ -342,9 +330,7 @@ class SingleNetworkModel(Model):
         for grad_and_vars in zip(*tower_grads):
             # Note that each grad_and_vars looks like the following:
             #   ((grad0_gpu0, var0_gpu0), ... , (grad0_gpuN, var0_gpuN))
-            #print('grad_and_vars len=', len(grad_and_vars))
-            #for j in grad_and_vars:
-            #    print(j)
+
             grads = []
             for g, _ in grad_and_vars:
                 # Add 0 dimension to the gradients to represent the tower.
@@ -364,5 +350,8 @@ class SingleNetworkModel(Model):
             grad_and_var = (grad, v)
             average_grads.append(grad_and_var)
         return average_grads
+
+name = 'singlenetworkmodel'
+
 
         

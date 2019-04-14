@@ -101,3 +101,6 @@ class DataQueue:
                 return data
         self.poplock.release()
         return None
+
+name = 'dataqueue'
+

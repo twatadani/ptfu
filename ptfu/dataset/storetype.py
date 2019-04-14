@@ -66,3 +66,6 @@ StoreType.DIR.writer = DirWriter
 StoreType.TAR.writer = TarWriter
 StoreType.ZIP.writer = ZipWriter
 StoreType.TFRECORD.writer = TFRecordWriter
+
+name = 'storetype'
+

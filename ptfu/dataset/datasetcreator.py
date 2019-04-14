@@ -214,8 +214,6 @@ class DatasetCreator:
                 ', 最終キューにpushされた総数: ' + str(pushedcount))
             sleep(1)
         wait(futures)
-        #for future in futures:
-            #print(future.done())
         logger.log('データセット作成が終了しました。')
         return
 
@@ -298,16 +296,17 @@ class DatasetCreator:
     def _q_pipe(srcq, dstq, n):
         ''' srcqをソースとして、dstqにn件のデータを読み込むワーカー関数 '''
         try:
-            #print('_q_pipeが呼び出されました')
             count = 0
             while count < n:
                 data = srcq.pop()
                 if data is not None:
                     dstq.push(data)
                 count += 1
-            #print('_q_pipeを終了します。')
             return
         except:
             import traceback
             traceback.print_exc()
+
+name = 'datasetcreator'
+
 

@@ -57,3 +57,6 @@ class CacheReader(ArchiveReader):
         ''' アーカイブをクローズする。
         CacheReaderでは特になにもしない(いちいちMemCacheを解放することはしない) '''
         return
+
+name = 'cachereader'
+

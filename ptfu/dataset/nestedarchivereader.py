@@ -76,4 +76,7 @@ class NestedArchiveReader(ArchiveReader):
         inner_class = fp[1][0].__class__
         inner_fp = fp[1][1]
         return inner_class._find_name(inner_fp, name)
+
+name = 'nestedarchivereader'
+
     

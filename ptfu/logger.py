@@ -111,3 +111,7 @@ def set_default_logger(logger):
     Logger.ptfu_default_logger = logger
     return
 
+
+name = 'logger'
+
+

@@ -1,5 +1,5 @@
 ''' Personal TensorFlow Utility dicomutil サブパッケージ: DICOM関連ユーティリティ '''
 
-from .Functions import bitconvert
+from .functions import bitconvert
 
 name = 'ptfu.dicomutil'

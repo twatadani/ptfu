@@ -19,4 +19,7 @@ class PKLReader(TypeReader):
         else:
             with open(bytesio_or_file, mode='rb') as f:
                 return pickle.load(f)
+
+name = 'pklreader'
+
     

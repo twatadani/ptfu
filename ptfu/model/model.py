@@ -41,3 +41,5 @@ class Model:
         from ..smartsessionhook import SmartSessionHook
         if isinstance(smartsessionhook, SmartSessionHook):
             self.trainhooks.append(smartsessionhook)
+
+name = 'model'

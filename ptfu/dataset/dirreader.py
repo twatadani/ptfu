@@ -51,3 +51,6 @@ class DirReader(ArchiveReader):
         ''' fpで与えられたアーカイブをクローズする
         DirReaderではダミー '''
         return
+
+name = 'dirreader'
+

@@ -34,3 +34,6 @@ class ZipWriter(ArchiveWriter):
         self.fp.writestr(name + '.pkl', bytesio.getbuffer())
         bytesio.close()
         return
+
+name = 'zipwriter'
+

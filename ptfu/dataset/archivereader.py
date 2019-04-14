@@ -158,10 +158,7 @@ class ArchiveReader:
             except:
                 import traceback
                 traceback.print_exc()
-            #if len(cacheset) > 0:
-                #print('メモリキャッシュ上で', len(hitnames), '件ヒットしました!')
-            #else:
-                #print('メモリキャッシュにはヒットしませんでした。')
+
             # 取得したデータをすべてqueueに入れる
             if len(cacheset) > 0:
                 queue.putAll(cacheset)
@@ -179,12 +176,7 @@ class ArchiveReader:
             except:
                 import traceback
                 traceback.print_exc()
-            #if len(cacheset) > 0:
-                #print('ディスクキャッシュ上で', len(hitnames), '件ヒットしました!')
-                #pass
-            #else:
-                #pass
-                #print('ディスクキャッシュにはヒットしませんでした。')
+
             # 取得したデータをすべてqueueに入れる
             if len(cacheset) > 0:
                 queue.putAll(cacheset)
@@ -281,4 +273,7 @@ class ArchiveReader:
         ''' fpで与えられたアーカイブをクローズする '''
         fp.close()
         return
+
+name = 'archivereader'
+
 

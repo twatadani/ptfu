@@ -17,3 +17,6 @@ class NPYReader(TypeReader):
         datadict['data'] = ndarray
         return datadict
 
+name = 'npyreader'
+
+

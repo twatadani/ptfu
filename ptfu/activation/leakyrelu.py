@@ -14,3 +14,5 @@ class LeakyReLU(ActivationFunction):
 
     def __call__(self, input_tensor):
         return tf.nn.leaky_relu(input_tensor, self.alpha)
+
+name = 'leakyrelu'

@@ -199,6 +199,9 @@ class OrEndFlag(EndFlag):
         elif (not self.flag1.should_end()) and self.flag2.should_end():
             return reason2
         else:
-            return '終了条件を満たしていません'
+            return '終了条件を満たしていません。 (may be bug?)'
+
+name = 'endflag'
+
             
             

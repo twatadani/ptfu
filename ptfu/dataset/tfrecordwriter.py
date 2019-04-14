@@ -75,5 +75,8 @@ class TFRecordWriter(ArchiveWriter):
         ret = tf.train.Feature(bytes_list=tf.train.BytesList(
             value=[encode_func()]))
         return ret
+
+name = 'tfrecordwriter'
+
     
 

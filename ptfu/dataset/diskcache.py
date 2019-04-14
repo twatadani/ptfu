@@ -46,3 +46,6 @@ class DiskCache:
         with open(fullpath, mode='wb') as f:
             pickle.dump(datadict, fullpath)
         return
+
+name = 'diskcache'
+

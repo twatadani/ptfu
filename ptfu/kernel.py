@@ -39,3 +39,6 @@ class Kernel:
         return get_default_logger()
 
 kernel = Kernel()
+
+name = 'kernel'
+

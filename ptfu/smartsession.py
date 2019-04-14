@@ -55,8 +55,6 @@ class SmartSession:
 
         # セッション初期化に必要なop
         self.initialization_ops = []
-        #tf.global_variables_initializer(),
-        #tf.local_variables_initializer() ]
         self.initialization_fd = None
 
         if session_initialization_ops is not None:
@@ -167,23 +165,11 @@ class SmartSession:
         # key=tensor, value=tensorの辞書を作る
         tensortensordict = { x: x for x in finalfetches }
 
-        # key-tensor, value=indexの逆引き辞書を作る
-        #actual_fetches = list(finalfetches)
-        #reversedict = {}
-        #for i, tensor in enumerate(actual_fetches):
-            #reversedict[tensor] = i
-
         # 実際にSessionによる評価を行う
         self.last_tensorvaluedict = self.session.run(tensortensordict,
                                                      feed_dict,
                                                      options,
                                                      run_metadata)
-
-        # 結果をdictに整理して保存する。
-        # 全部
-        #self.last_tensorvaluedict = {}
-        #for tensor in actual_fetches:
-            #self.last_tensorvaluedict[tensor] = result[reversedict[tensor]]
 
         # 最新のglobal stepを保存
         self.last_global_step = self.last_tensorvaluedict[self.gstep_tensor]
@@ -199,28 +185,17 @@ class SmartSession:
         self.last_tensorvaluedict_endflag = self._extract_tensorvaluedict(
             self.last_tensorvaluedict, self.endflag_tensor_set)
 
-
-        #self.last_tensorvaluedict_endflag = {}
-        #for tensor in self.endflag_tensor_set:
-            #self.last_tensorvaluedict_endflag[tensor] = result[reversedict[tensor]]
-
         # 次は返り値用
-        #self.last_tensorvaluedict_user = {}
         self.last_tensorvaluedict_user = self._extract_tensorvaluedict(
             self.last_tensorvaluedict, return_fetches)
 
         if is_fetch_list:
             self.last_fetches = [ self.last_tensorvaluedict_user[x] for x in return_fetches ]
-            #for tensor in fetches:
-                #self.last_fetches.append(result[reversedict[tensor]])
         else:
-            #self.last_fetches = result[reversedict[fetches]]
             self.last_fetches = self.last_tensorvaluedict_user[fetches]
         
         # stepに応じて登録されたhookを実行
         if run_hooks:
-            #self.run_loop_hooks(self.last_global_step, feed_dict=feed_dict,
-                                #options=options, run_metadata=run_metadata)
             self.run_loop_hooks(self.last_global_step, self.last_tensorvaluedict)
 
         return self.last_fetches
@@ -235,17 +210,13 @@ class SmartSession:
         個々のhookはSmartSessionHookのインスタンス '''
 
         if isinstance(hook_list, list) or isinstance(hook_list, tuple):
-            #print('list mode')
             if self.hooks is None:
-                #print('self.hooks is None')
                 self.hooks = hook_list
                 self.executor = ThreadPoolExecutor()
             else:
                 self.hooks.extend(hook_list)
         else:
-            #print('single mode')
             if self.hooks is None:
-                #print('self.hooks is None')
                 self.hooks = [hook_list]
                 self.executor = ThreadPoolExecutor()
             else:
@@ -260,26 +231,6 @@ class SmartSession:
         ''' 最新のrunの結果を返す '''
         return self.last_fetches_dict
 
-    # def run_hooks(self, global_step, feed_dict=None, options=None, run_metadata=None):
-
-    #     for hook in self.hooks:
-
-    #         tensorvaluedic = {}
-    #         if len(hook.tensorlist) > 0:
-    #             values = self.session.run(hook.tensorlist, feed_dict, options, run_metadata)
-    #         else:
-    #             values = []
-    #         for i, tensor in enumerate(hook.tensorlist):
-    #             tensorvaluedic[tensor] = values[i]
-
-    #         if hook.mod == global_step % hook.step:
-    #             if hook.sync:
-    #                 hook(tensorvaluedic)
-    #             else:
-    #                 future = self.executor.submit(hook, tensorvaluedic)
-    #     return
-
-    #def run_initial_or_final_hooks(self, initial=True, mastertensorvaluedict):
     def run_initial_or_final_hooks(self, initial=True, feed_dict=None, options=None,
                                    run_metadata=None):
         ''' 初期hookを実行する 
@@ -300,88 +251,20 @@ class SmartSession:
                 self.initial_hooks_toberun = False
         return
 
-        #print('run_initial_or_final_hooksが起動されました。initial=', initial)
-
-        # tensortensordict = self._create_tensortensordict(self.hooks, mode=SmartSessionHook.ALL)
-        # if len(tensortensordict) > 0:
-        #     mastertensorvaluedict = self.session.run(tensortensordict)
-        # else:
-        #     mastertensorvaluedict = {}
-        # futures = []
-        # for hook in self.hooks:
-        #     #print('hookをチェックしています。hookname=', hook.hookname)
-        #     check_variable = hook.run_at_startup if initial else hook.run_at_shutdown
-        #     print('check_variable:', check_variable)
-        #     if check_variable == True:
-        #         tensorvaluedict = self.__class__._extract_tensorvaluedict(mastertensorvaluedict,
-        #                                                                   hook.tensorlist)
-        #         #print(hook.hookname, 'を起動します。')
-        #         if hook.sync:
-        #             futures.append(self._run_hook_impl(hook, tensorvaluedict))
-        #         else:
-        #             future = self._run_hook_impl(hook, tensorvaluedict)
-        #             self.executor.submit(self.__class__._run_future_exc_print, future, logger)
-        # if len(futures) > 0:
-        #     wait(futures)
-        #     for future in futures:
-        #         exc = future.exception()
-        #         if exc is not None:
-        #             print(exc)
-        # return
-        
-
-    #def run_loop_hooks(self, global_step, feed_dict=None, options=None, run_metadata=None):
     def run_loop_hooks(self, global_step, mastertensorvaluedict):
         ''' loop hookを実行する '''
         judge_func = lambda hook: (isinstance(hook, LoopSmartSessionHook) and \
                                    hook.mod == global_step % hook.step) or \
             (isinstance(hook, OneTimeSmartSessionHook) and hook.step == global_step)
-        #self._run_hook_common(judge_func, feed_dict, options, run_metadata)
         self._run_hook_common(judge_func, mastertensorvaluedict)
         return
 
-        # from concurrent.futures import wait
-        # from .logger import get_default_logger
-        # logger = get_default_logger()
-        # tensortensordict = self._create_tensortensordict(self.hooks, mode=SmartSessionHook.LOOP)
-        # if len(tensortensordict) > 0:
-        #     mastertensorvaluedict = self.session.run(tensortensordict, feed_dict, options,
-        #                                              run_metadata)
-        # else:
-        #     mastertensorvaluedict = {}
-        # futures = []
-        # for hook in self.hooks:
-        #     if (isinstance(hook, LoopSmartSessionHook) and \
-        #         hook.mod == global_step % hook.step) or \
-        #     (isinstance(hook, OneTimeSmartSessionHook) and hook.step == global_step):
-        #         tensorvaluedict = self._extract_tensorvaluedict(mastertensorvaluedict,
-        #                                                         hook.tensorlist)
-        #         print(hook.hookname, 'を起動します')
-        #         if hook.sync:
-        #             futures.append(self._run_hook_impl(hook, tensorvaluedict))
-        #         else:
-        #             future = self._run_hook_impl(hook, tensorvaluedict)
-        #             self.executor.submit(self.__class__._run_future_exc_print, future, logger)
-        # if len(futures) > 0:
-        #     wait(futures)
-        #     for future in futures:
-        #         exc = future.exception()
-        #         if exc is not None:
-        #             print(exc)
-        # return
-
-    #def _run_hook_common(self, hook_judge_func, feed_dict=None, options=None, run_metadata=None):
     def _run_hook_common(self, hook_judge_func, mastertensorvaluedict):
         ''' run_loop_hookとrun_initial_or_final_hookの共通部分を記載 '''
         from concurrent.futures import wait
         from .logger import get_default_logger
         logger = get_default_logger()
-        #tensortensordict = self._create_tensortensordict(self.hooks, mode=SmartSessionHook.LOOP)
-        #if len(tensortensordict) > 0:
-            #mastertensorvaluedict = self.session.run(tensortensordict, feed_dict, options,
-                                                     #run_metadata)
-        #else:
-            #mastertensorvaluedict = {}
+
         futures = []
         for hook in self.hooks:
             if hook_judge_func(hook) == True:
@@ -399,7 +282,6 @@ class SmartSession:
                         if exc is not None:
                             logger.error(str(exc))
         return
-
 
     @staticmethod
     def _run_future_exc_print(future, logger):
@@ -467,6 +349,9 @@ class SmartSession:
             traceback.print_exc()
             logger.warning('続行します。')
             return
+
+name = 'smartsession'
+
 
             
         

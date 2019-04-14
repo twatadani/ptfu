@@ -42,11 +42,12 @@ class Cifar10BatchReader(ArchiveReader):
         ''' fp内からnameに該当するデータがあるかどうかを探す 
         CIFAR10BatchReaderの場合、datadictを作成できるようにするため
         (fp, 該当データのあるindex)を返すようにする '''
-        #data = fp[b'data']
         names = fp[b'filenames']
         bname = name.encode()
         if bname in names:
-            #return data[names.index(bname)]
             return (fp, names.index(bname))
         else:
             return None
+
+name = 'cifar10batchreader'
+

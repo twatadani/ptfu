@@ -1,67 +1,7 @@
-''' neuralnet.py - ニューラルネットを表現するモジュール '''
+''' layerbesedneuralnet.py - レイヤーベースのニューラルネットを表現するモジュール '''
 
-class NeuralNet:
-    ''' 一つのニューラルネットを表現する 
-    ライブラリユーザはNeuralNet(またはその子クラス)のインスタンスを生成して使用する '''
-
-    def __init__(self, input_tensors, network_name=None):
-        ''' コンストラクタ
-        input_tensors: このNeuralNetの入力に使われるtensor, placeholder等のTensorFlowパラメータ
-        辞書形式で、'name': tensorの組み合わせとなる
-        network_name: このNeuralNetインスタンスの名前となる文字列
-        '''
-
-        self.inputs = None
-        if input_tensors is None: # Noneの場合
-            self.inputs = {} # 空辞書にする
-        elif isinstance(input_tensors, dict): #辞書型の場合
-            self.inputs = input_tensors # そのまま使う
-        else: # リストでない場合は
-            self.inputs = { 'input': input_tensors }
-
-        self._prepare_training_tensor()
-
-        self.name = None
-        if network_name is None:
-            self.name = 'unnamed_net'
-        else:
-            self.name = network_name
-
-        self.outputs = {}
-        return
-
-    def define_network(self, devices, input_tensors):
-        ''' ネットワークを定義する。実際には具象クラスで行う。 
-        devicesにはこのネットワークで使用するデバイスのリストが与えられる
-        input_tensorsは並列実行などで適切に分割されたinputが与えられる。
-        この関数は実際にはModelのインスタンスから呼ばれるため、ライブラリユーザーは通常使用する必要はない '''
-        raise NotImplementedError
-
-    def _prepare_training_tensor(self):
-        ''' 学習用か検証用かを設定するboolean tensorを設定する '''
-        from ..kernel import kernel
-        self.training_tensor = kernel.get_training_tensor()
-        self.inputs['training'] = self.training_tensor
-        return
-
-    def get_input_tensors(self):
-        ''' このNeuralNetの入力tensorのリストを得る '''
-        return self.inputs
-
-    def get_output_tensors(self):
-        ''' このNeuralNetの出力tensorのリストを得る '''
-        return self.outputs
-
-    def add_output_tensor(self, tensor, name):
-        ''' NeuralNetの出力tensorのリストにtensorを加える '''
-        self.outputs[name] = tensor
-        return
-
-    def get_training_tensor(self):
-        return self.training_tensor
-
-name = 'neuralnet'
-
+from .neuralnet import NeuralNet
+from .nnlayer import NNLayer
 
 class LayerBasedNeuralNet(NeuralNet):
     ''' レイヤー構造から構成されるNeuralNet: NeuralNetクラスを継承する '''
@@ -141,6 +81,9 @@ class LayerBasedNeuralNet(NeuralNet):
         s += seprow
 
         return s
+
+name = 'layerbasedneuralnet'
+
 
 class NNLayer:
     ''' Layerを表現するクラス。TensorFlowの関数あるいはクラスに対するラッパー

@@ -31,16 +31,11 @@ class Classifier(SingleNetworkModel):
         self._define_network_common(tfconfig, minibatchsize_per_tower)
         
         # 分類タスク用のパラメータ定義
-
-        #classwise_zero = tf.zeros(shape=(self.nclasses,), dtype=tf.int64)
-
-        #cpu_device = TFConfig.XLA_CPU if tfconfig.use_xla else TFConfig.CPU
         metric_device = None
         if tfconfig.use_gpu:
             if tfconfig.use_xla:
                 metric_device = TFConfig.XLA_GPU
             else:
-                #metric_device = tfconfig.gpu_list[-1]
                 metric_device = tfconfig.towers[0][-1]
         else:
             if tfconfig.use_xla:
@@ -393,16 +388,14 @@ class Classifier(SingleNetworkModel):
         logger.log('In train validationを実行しています。')
         # 準備
         # トレーニングをオフにする
-        self.session.session.run(self.set_training_false_op)#, run_hooks=False)
+        self.session.session.run(self.set_training_false_op)
 
         is_tfrecord = isinstance(validation_dataset, TFRecordDataSet)
-        if is_tfrecord: #and not self.in_train_validation_initialized:
+        if is_tfrecord:
             # validation用のイテレータを初期化する
             fd = { validation_dataset.srclist_ph: list(validation_dataset.validationsrclist) }
-            #print('validation iteratorの初期化オペレーションを行います。')
             self.session.session.run(validation_dataset.validation_iterator_initializer(),
-                             feed_dict = fd)#, run_hooks=False)
-            #print('validation iteratorの初期化オペレーションが完了しました。')
+                             feed_dict = fd)
             self.in_train_validation_initialized = True
 
         self.session.run(self.validation_step_reset_op, run_hooks=False)
@@ -424,7 +417,7 @@ class Classifier(SingleNetworkModel):
         v_accuracy = self.session.session.run(self.validation_overall_accuracy)
 
         # 後片付け
-        self.session.session.run(self.set_training_true_op)#, run_hooks=False)
+        self.session.session.run(self.set_training_true_op)
         if is_tfrecord:
             # random minibatchをイニシャライズする
             fd = {
@@ -433,3 +426,6 @@ class Classifier(SingleNetworkModel):
             self.session.session.run(validation_dataset.train_iterator_initializer(), feed_dict=fd)
         logger.log('In train validationを終了します。validation overall accuracy = ' + str(v_accuracy))
         return
+
+name = 'classifier'
+

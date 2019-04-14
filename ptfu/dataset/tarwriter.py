@@ -38,3 +38,6 @@ class TarWriter(ArchiveWriter):
         self.fp.addfile(info, fileobj=bytesio)
         bytesio.close()
         return
+
+name = 'tarwriter'
+

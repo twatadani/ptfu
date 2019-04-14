@@ -36,3 +36,6 @@ class ZipReader(ArchiveReader):
         bytesio = BytesIO(data)
         return bytesio
 
+name = 'zipreader'
+
+

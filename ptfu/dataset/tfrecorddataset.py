@@ -108,9 +108,6 @@ class TFRecordDataSet(DataSet):
         ''' 内部的に使用するTFRecordのパース用関数 '''
         from ..kernel import kernel
         featuredict = { l: tf.FixedLenFeature([], dtype=tf.string) for l in self.labellist }
-        #featuredict = {}
-        #for l in self.labellist:
-            #featuredict[l] = tf.FixedLenFeature([], dtype=tf.string)
 
         features = tf.parse_single_example(example,features = featuredict)
         training_tensor = kernel.get_training_tensor()
@@ -197,3 +194,6 @@ class TFRecordDataSet(DataSet):
 
     def validation_iterator_initializer(self):
         return self.validation_initializer
+
+name = 'tfrecorddataset'
+

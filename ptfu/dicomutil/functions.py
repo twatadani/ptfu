@@ -1,4 +1,4 @@
-''' Functions.py DICOMユーティリティにおけるユーティリティー関数群 '''
+''' functions.py DICOMユーティリティにおけるユーティリティー関数群 '''
 
 import numpy as np
 
@@ -75,9 +75,10 @@ def bitconvert(dcmdata, verbose=False):
                 raise NotImplementedError
             else: # unsigned big endian
                 pixelarray = dcmdata.pixel_array
-                #if pixelarray.dtype != np.uint16:
-                #    pixelarray = np.uint16(pixelarray)
                 dcmdata.BitsStored = 16
                 dcmdata.HighBits = 15
                 dcmdata.PixelData = pixelarray.tobytes()
     return dcmdata
+
+name = 'functions'
+

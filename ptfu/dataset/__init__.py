@@ -6,6 +6,5 @@ from .datasetcreator import DatasetCreator, SplitManner
 from .dataset import DataSet, LabelStyle
 from .tfrecorddataset import TFRecordDataSet
 from .tfrecordwriter import TFRecordWriter
-#from .dataset import TFRecordDataSet, NPYDataSet, PILDataSet, JPGDataSet, PNGDataSet, LabelStyle
 
 name='ptfu.dataset'

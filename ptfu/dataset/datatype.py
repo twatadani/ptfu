@@ -35,3 +35,6 @@ DataType.DICOM.reader = DICOMReader
 DataType.NPY.reader = NPYReader
 DataType.PKL.reader = PKLReader
 DataType.CIFAR10.reader = Cifar10DataReader
+
+name = 'datatype'
+

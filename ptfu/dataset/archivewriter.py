@@ -90,3 +90,6 @@ class ArchiveWriter:
             import traceback
             traceback.print_exc()
 
+name = 'archivewriter'
+
+

@@ -8,3 +8,6 @@ class JPGReader(PILReader):
         from .datatype import DataType
         super(JPGReader, self).__init__(DataType.JPG)
         return
+
+name = 'jpgreader'
+

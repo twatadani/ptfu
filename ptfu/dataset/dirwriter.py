@@ -31,3 +31,6 @@ class DirWriter(ArchiveWriter):
         with open(fullname, mode='wb') as f:
             pikle.dump(datadict, f)
         return
+
+name = 'dirwriter'
+

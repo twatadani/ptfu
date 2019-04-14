@@ -16,3 +16,6 @@ class ValidationHook(LoopSmartSessionHook):
                                             required_tensor_list=required_tensor_list, hook_name=hook_name, self_or_cls=self_or_cls, **funcoptions)
         return
 
+name = 'validationhook'
+
+

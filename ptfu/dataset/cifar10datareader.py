@@ -31,4 +31,7 @@ class Cifar10DataReader(TypeReader):
         datadict['label'] = labels[index]
 
         return datadict
+
+name = 'cifar10datareader'
+
         

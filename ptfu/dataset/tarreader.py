@@ -77,3 +77,6 @@ class TarReader(ArchiveReader):
         stream = fp.extractfile(name) # stereamはBufferedReader
         stream.seek(0)
         return BytesIO(stream.read())
+
+name = 'tarreader'
+

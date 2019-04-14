@@ -28,3 +28,6 @@ class CacheWriter(ArchiveWriter):
         与えられる1件のデータを書き込む 
         '''
         self.dstpath.write(name, datadict)
+
+name = 'cachewriter'
+

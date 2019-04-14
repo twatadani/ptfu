@@ -2,8 +2,6 @@
 
 from io import BytesIO
 
-from ptfu import get_default_logger
-
 class MemCache:
     ''' メモリキャッシュを表すクラス
     内部にはcachedictがあり、
@@ -37,3 +35,6 @@ class MemCache:
         ''' name, datadictに相当するdatadictyデータをキャッシュに書き込む '''
         self.cachedict[name] = datadict
         return
+
+name = 'memcache'
+
