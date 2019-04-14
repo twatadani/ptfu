@@ -1,19 +1,56 @@
 ''' singlenetworkmodel.py - 単一のネットワークから構成されるモデル '''
 
 from .model import Model
+import tensorflow as tf
 
 class SingleNetworkModel(Model):
     ''' 単一のニューラルネットから構成される学習モデル '''
     
-    def __init__(self, neural_network, optimizer):
+    def __init__(self, neural_network, optimizer, tfconfig, total_minibatchsize):
+        ''' SingleNetworkModelの初期化
+        neural_network: ニューラルネット。ptfu.nn.NeuralNetのインスタンスを指定する
+        optimizer: この学習モデルのオプティマイザ。
+        tfconfig: このモデルの学習に用いるTFConfigオブジェクト
+        total_minibatchsize: 並列学習のtower分をすべて合わせたミニバッチサイズ '''
         from ..nn.neuralnet import NeuralNet
+        from ..tfconfig import TFConfig
+        from ..kernel import kernel
 
         super(SingleNetworkModel, self).__init__()
+
+        # loggerの設定
+        logger = kernel.logger()
+
+        # neural_networkのチェック
         assert isinstance(neural_network, NeuralNet) # 型チェック
         self.nn = neural_network
+
+        # optimizerのチェック
+        assert isinstance(optimizer, tf.train.Optimizer)
         self.optimizer = optimizer
+
+        # tfconfigのチェック
+        assert isinstance(tfconfig, ptfu.TFConfig)
+        self.tfconfig = tfconfig
+
+        # initializerで定義する変数
         self.training = None # マルチプロセスモデルに従い、trainingはmultiprocessing.Queueに変更。
+        self.defined = False # ネットワーク定義が完了しているかどうか
         self.prepared = False # 学習準備ができたかどうか
+
+        # ネットワークの定義
+        self.minibatchsize = total_minibatchsize
+        ntowers = tfconfig.ntowers()
+        modulo = total_minibatchsize % ntowers
+        minibatchsize_per_tower = total_minibatchsize // ntowers
+        if modulo != 0:
+            logger.warning('total minibatchsizeがタワー数で割り切れません。total_minibatchsize: ' + str(total_minibatchsize) + ', タワー数: ' + str(ntowers))
+            logger.warning('タワーあたりのminibatchsize: ' + str(minibatchsize_per_tower) + ', total minibatchsize: ' + str(minibatchsize_per_tower * ntowers) + 'で実行します。')
+            self.minibatchsize = minibatchsize_per_tower * ntowers
+        
+        self.define_network(self.tfconfig, minibatchsize_per_tower)
+        self.defined = True
+            
         return
 
     def get_training_tensor(self):
@@ -23,17 +60,17 @@ class SingleNetworkModel(Model):
     def define_network(self, tfconfig, minibatchsize_per_tower):
         ''' パラメータを与えてネットワーク定義を行う
         tfconfig: TFConfigオブジェクト
-        minibatchsize_per_tower: ミニバッチサイズ。タワー型並列実行については1タワーあたりの数 '''
+        minibatchsize_per_tower: ミニバッチサイズ。タワー型並列実行については1タワーあたりの数
+        通常、この関数は__init__から呼ばれるためライブラリユーザーが明示的に呼び出す必要はない
+        '''
         self._define_network_common(tfconfig, minibatchsize_per_tower)
         return
 
     def _define_network_common(self, tfconfig, minibatchsize_per_tower):
         ''' define_networkの共通部分 子クラスはこれに独自処理を加える '''
-        import tensorflow as tf
         from ..kernel import kernel
 
         ntowers = tfconfig.ntowers()
-        self.minibatchsize = ntowers * minibatchsize_per_tower
 
         if ntowers == 1:
             self.nn.define_network(tfconfig.towers[0], self.nn.inputs)
