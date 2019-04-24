@@ -22,7 +22,7 @@ class SingleNetworkModel(Model):
         logger = kernel.logger()
 
         # neural_networkのチェック
-        assert isinstance(neural_network, NeuralNet) # 型チェック
+        assert isinstance(neural_network, NeuralNet)
         self.nn = neural_network
 
         # optimizerのチェック
